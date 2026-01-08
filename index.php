@@ -1,3 +1,3 @@
 <?php
-header("Location: topic_auth/index_login.php");
+header("Location: auth_login.php");
 exit;
