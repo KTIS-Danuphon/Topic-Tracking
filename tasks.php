@@ -1,4 +1,50 @@
-<?php include 'session_check.php'; ?>
+<?php
+include 'session_check.php';
+date_default_timezone_set('Asia/Bangkok');
+
+require_once 'class/crud.class.php';
+require_once 'class/util.class.php';
+require_once 'class/encrypt.class.php';
+
+$object   = new CRUD();
+$util     = new Util();
+$Encrypt  = new Encrypt_data();
+$now = new DateTime();
+$formatted_now = $now->format('Y-m-d H:i:s');
+
+$table = 'tb_topics_c050968';
+$fields = 'fd_topic_id, fd_topic_title, fd_topic_detail, fd_topic_category, fd_topic_mentioned, fd_topic_status, fd_topic_participant, fd_topic_created_by, fd_topic_importance, fd_topic_private, fd_topic_active, fd_topic_created_at ';
+switch ($_SESSION['user_status']) {
+    //admin / executive → เห็น user ทุกคน
+    case 'admin':
+    case 'executive':
+        $where = 'WHERE fd_topic_active = "1"   ';
+        break;
+    //user → เห็นเฉพาะคนอื่นในแผนกเดียวกัน มีสถานะเป็น user และ active
+    case 'user':
+    default:
+        $where = 'WHERE fd_topic_creaed_by = "' . $_SESSION['user_id'] . '" AND fd_topic_active = "1" AND fd_topic_importance LIKE "[' . $_SESSION['user_id'] . ',%" OR fd_topic_importance LIKE "%,' . $_SESSION['user_id'] . ']" OR fd_topic_importance LIKE "%,' . $_SESSION['user_id'] . ',%" OR fd_topic_importance = "[' . $_SESSION['user_id'] . ']" ';
+        break;
+}
+$where .= ' ORDER BY fd_topic_created_at DESC ';
+
+$result_topic = $object->ReadData($table, $fields, $where);
+$topic = [];
+
+foreach ($result_topic as $row) {
+    $topic[] = [
+        'id' =>  $row['fd_topic_id'], //เพิ่ม #Task- หน้า id งาน
+        'title' => $row['fd_topic_title'], //หัวข้องงาน
+        'description' => $row['fd_topic_detail'], //รายละเอียดงาน
+        'category' => $row['fd_topic_category'], //หมวดหมู่งาน
+        'status' => $row['fd_topic_status'], //สถานะงาน
+        'importance' => $row['fd_topic_importance'], //ความเร่งด่วน
+        'created_at' => $row['fd_topic_created_at'], //วันที่สร้างงาน
+        'encrypt_id' => $Encrypt->EnCrypt_pass($row['fd_topic_id']), //เข้ารหัส id งาน
+
+    ];
+}
+?>
 <!DOCTYPE html>
 <html lang="th">
 
@@ -608,68 +654,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Mock data
-        const mockTasks = [{
-                id: 1,
-                title: "พัฒนาระบบ Login ใหม่",
-                description: "ออกแบบและพัฒนาระบบ Login ที่รองรับ OAuth 2.0",
-                category: "development",
-                status: "in-progress",
-                importance: 5,
-                created_at: "2024-12-20 10:30:00",
-                encrypt_id: "abc123"
-            },
-            {
-                id: 2,
-                title: "ออกแบบ UI/UX Dashboard",
-                description: "สร้าง mockup และ prototype สำหรับหน้า Dashboard",
-                category: "design",
-                status: "pending",
-                importance: 4,
-                created_at: "2024-12-19 14:20:00",
-                encrypt_id: "def456"
-            },
-            {
-                id: 3,
-                title: "แก้ไข Bug หน้า Profile",
-                description: "แก้ไขปัญหาการแสดงผลรูปภาพไม่ถูกต้อง",
-                category: "development",
-                status: "completed",
-                importance: 3,
-                created_at: "2024-12-18 09:15:00",
-                encrypt_id: "ghi789"
-            },
-            {
-                id: 4,
-                title: "ประชุมทีมประจำสัปดาห์",
-                description: "ประชุมสรุปงานและวางแผนสัปดาห์หน้า",
-                category: "meeting",
-                status: "completed",
-                importance: 2,
-                created_at: "2025-12-01 16:00:00",
-                encrypt_id: "jkl012"
-            },
-            {
-                id: 5,
-                title: "จัดทำเอกสาร API Documentation",
-                description: "เขียนเอกสารคู่มือการใช้งาน API สำหรับ Developer",
-                category: "other",
-                status: "in-progress",
-                importance: 4,
-                created_at: "2025-12-09 11:45:00",
-                encrypt_id: "mno345"
-            },
-            {
-                id: 6,
-                title: "วางแผนการตลาดออนไลน์",
-                description: "สร้างกลยุทธ์การตลาดบน Social Media",
-                category: "marketing",
-                status: "pending",
-                importance: 5,
-                created_at: "2025-12-21 13:30:00",
-                encrypt_id: "pqr678"
-            }
-        ];
+        const mockTasks = <?php echo json_encode($topic); ?>;
 
         let allTasks = [...mockTasks];
         let filteredTasks = [...mockTasks];
@@ -768,7 +753,7 @@
                 <tr onclick="viewTask('${task.encrypt_id}')">
                     <td>
                         <div class="task-id">
-                            <i class="bi bi-hash"></i>${new Date(task.created_at).getFullYear()}-${task.id.toString().padStart(4, '0')}
+                            <i class="bi bi-hash"></i>${task.id.toString().padStart(4, '0')}
                         </div>
                     </td>
                     <td class="task-title-cell">
@@ -777,7 +762,7 @@
                     </td>
                     <td>
                         <span class="category-badge">
-                            <i class="bi bi-tag me-1"></i>${getCategoryName(task.category)}
+                            <i class="bi bi-tag me-1"></i>${task.category}
                         </span>
                     </td>
                     <td>
