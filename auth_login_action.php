@@ -22,7 +22,7 @@ $Encrypt  = new Encrypt_data();
 $username = $util->testInput($_POST['username']);
 $password  = $Encrypt->EnCrypt_pass($util->testInput($_POST['password']));
 $table = 'tb_users_c050968 t1 ';
-$fields = 'fd_user_id, fd_user_name, fd_user_fullname, fd_user_password, fd_user_status, fd_user_group ';
+$fields = 'fd_user_id, fd_user_name, fd_user_fullname, fd_user_password, fd_user_status, fd_user_dept ';
 $where = 'WHERE fd_user_name = "' . $username . '" AND fd_user_password = "' . $password . '" AND fd_user_active = "1"  ';
 
 $result_user = $object->ReadData($table, $fields, $where);
@@ -33,6 +33,7 @@ if (!empty($result_user)) {
     $_SESSION['user_name'] = $result_user[0]['fd_user_name'];
     $_SESSION['user_fullname'] = $result_user[0]['fd_user_fullname'];
     $_SESSION['user_status'] = $result_user[0]['fd_user_status']; // admin, executive, user
+    $_SESSION['user_dept'] = $result_user[0]['fd_user_dept']; //ฝ่าย
     switch ($result_user[0]['fd_user_status']) {
         case 'admin':
             $_SESSION['user_status_name'] = 'ผู้ดูแลระบบ';
@@ -47,7 +48,7 @@ if (!empty($result_user)) {
             $_SESSION['user_status_name'] = 'ไม่ระบุ';
             break;
     }
-    // $_SESSION['user_group'] = $result_user[0]['fd_user_group']; // กลุ่มผู้ใช้
+    // $_SESSION['user_group'] = $result_user[0]['fd_user_dept']; // กลุ่มผู้ใช้
     // $_SESSION['login_time'] = time(); // เก็บเวลาที่ login
 ?>
     <!DOCTYPE html>
