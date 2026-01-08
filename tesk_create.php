@@ -1,4 +1,55 @@
-<?php include 'session_check.php'; ?>
+<?php
+include 'session_check.php';
+date_default_timezone_set('Asia/Bangkok');
+
+require_once 'class/crud.class.php';
+require_once 'class/util.class.php';
+require_once 'class/encrypt.class.php';
+
+$object   = new CRUD();
+$util     = new Util();
+$Encrypt  = new Encrypt_data();
+$now = new DateTime();
+$formatted_now = $now->format('Y-m-d H:i:s');
+
+$table = 'tb_users_c050968 user';
+$fields = 'user.fd_user_id, user.fd_user_fullname, user.fd_user_status, dept.fd_dept_name';
+$where = 'LEFT JOIN tb_departments_c050968 dept ON user.fd_user_dept = dept.fd_dept_id ';
+switch ($_SESSION['user_status']) {
+    //admin / executive → เห็น user ทุกคน
+    case 'admin':
+    case 'executive':
+        $where .= 'WHERE user.fd_user_status = "user" AND user.fd_user_active = "1"';
+        break;
+    //user → เห็นเฉพาะคนอื่นในแผนกเดียวกัน มีสถานะเป็น user และ active
+    case 'user':
+    default:
+        $where .= 'WHERE user.fd_user_id != "' . $_SESSION['user_id'] . '" AND user.fd_user_status = "user" AND user.fd_user_dept = "' . $_SESSION['user_dept'] . '" AND user.fd_user_active = "1"';
+        break;
+}
+$result_user = $object->ReadData($table, $fields, $where);
+//ปรับเป้น json 
+$users = [];
+
+foreach ($result_user as $row) {
+    $fullname = $row['fd_user_fullname'];
+    $nameParts = explode(' ', $fullname);
+
+    $avatar = '';
+    foreach ($nameParts as $p) {
+        $avatar .= mb_substr($p, 0, 1); //ตัวแรกของชื่อและสกุล
+    }
+
+    $users[] = [
+        'id'     => $row['fd_user_id'],
+        'name'   => $fullname,
+        'role'   => $row['fd_dept_name'], // ชื่อฝ่ายงาน
+        'avatar' => $avatar
+    ];
+}
+
+// echo json_encode($users, JSON_UNESCAPED_UNICODE);
+?>
 
 <!DOCTYPE html>
 <html lang="th">
@@ -7,6 +58,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>สร้างงานใหม่ - Topic Tracking</title>
+    <link rel="icon" href="ktis.svg" type="image/svg+xml">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
@@ -759,16 +811,17 @@
 
                         <div class="col-md-4 mb-3">
                             <label class="form-label">
-                                หมวดหมู่ <span class="text-danger">*</span>
+                                หมวดหมู่ <span class="text-danger">ไม่บังคับ</span>
                             </label>
-                            <select class="form-select" id="taskCategory" name="taskCategory" required>
+                            <!-- <select class="form-select" id="taskCategory" name="taskCategory" required>
                                 <option value="">เลือกหมวดหมู่</option>
                                 <option value="development">พัฒนาระบบ</option>
                                 <option value="design">ออกแบบ</option>
                                 <option value="marketing">การตลาด</option>
                                 <option value="meeting">ประชุม</option>
                                 <option value="other">อื่นๆ</option>
-                            </select>
+                            </select> -->
+                            <input type="text" class="form-control" id="taskCategory" name="taskCategory" placeholder="ระบุชื่อหมวดหมู่">
                         </div>
                     </div>
 
@@ -802,7 +855,7 @@
 
                         <div class="col-md-4 mb-3">
                             <label class="form-label">
-                                วันที่ครบกำหนด
+                                วันที่ครบกำหนด(ไม่บังคับ)
                             </label>
                             <input type="date" class="form-control" id="taskDueDate" name="taskDueDate">
                             <small class="text-muted d-block mt-2">
@@ -848,11 +901,21 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">เพิ่มผู้เกี่ยวข้องเพิ่มเติม (ไม่บังคับ)</label>
+                        <label class="form-label">เพิ่มผู้เกี่ยวข้องเพิ่มเติม <code>*ผู้ไม่เกี่ยวข้องจะไม่สามารถมองเห็นงานนี้ได้ (ยกเว้น แอดมินและผู้บริหาร)</code></label>
 
                         <div class="mb-2">
                             <input type="text" class="form-control" id="userSearchInput"
                                 placeholder="🔍 พิมพ์ชื่อเพื่อค้นหาผู้ใช้...">
+                        </div>
+
+                        <!-- เพิ่มปุ่มเลือกทั้งหมด -->
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="selectAllUsers" onchange="toggleSelectAll()">
+                                <label class="form-check-label" for="selectAllUsers">
+                                    <strong>เลือกทั้งหมด</strong>
+                                </label>
+                            </div>
                         </div>
 
                         <div class="user-selection-list" id="userSelectionList"></div>
@@ -947,37 +1010,38 @@
         });
     </script>
     <script>
-        const users = [{
-                id: 1,
-                name: 'สมชาย ใจดี',
-                role: 'Developer',
-                avatar: 'SC'
-            },
-            {
-                id: 2,
-                name: 'สมหญิง สวยงาม',
-                role: 'Designer',
-                avatar: 'SS'
-            },
-            {
-                id: 3,
-                name: 'วิชัย รักงาน',
-                role: 'Project Manager',
-                avatar: 'WR'
-            },
-            {
-                id: 4,
-                name: 'มานี มีเงิน',
-                role: 'Marketing',
-                avatar: 'MM'
-            },
-            {
-                id: 5,
-                name: 'ประเสริฐ ดีเด่น',
-                role: 'Developer',
-                avatar: 'PD'
-            }
-        ];
+        // const users = [{
+        //         id: 1,
+        //         name: 'สมชาย ใจดี',
+        //         role: 'Developer',
+        //         avatar: 'SC'
+        //     },
+        //     {
+        //         id: 2,
+        //         name: 'สมหญิง สวยงาม',
+        //         role: 'Designer',
+        //         avatar: 'SS'
+        //     },
+        //     {
+        //         id: 3,
+        //         name: 'วิชัย รักงาน',
+        //         role: 'Project Manager',
+        //         avatar: 'WR'
+        //     },
+        //     {
+        //         id: 4,
+        //         name: 'มานี มีเงิน',
+        //         role: 'Marketing',
+        //         avatar: 'MM'
+        //     },
+        //     {
+        //         id: 5,
+        //         name: 'ประเสริฐ ดีเด่น',
+        //         role: 'Developer',
+        //         avatar: 'PD'
+        //     }
+        // ];
+        const users = <?php echo json_encode($users); ?>;
 
         let mentionedUsers = [];
         let selectedFiles = [];
@@ -1314,17 +1378,75 @@
             `).join('');
         }
 
+        // ฟังก์ชันเลือก/ยกเลิกทั้งหมด
+        function toggleSelectAll() {
+            const selectAllCheckbox = document.getElementById('selectAllUsers');
+
+            if (selectAllCheckbox.checked) {
+                // เลือกทั้งหมด - เพิ่มทุกคนที่ยังไม่ได้เลือก
+                additionalSelectedUsers = users.map(u => u.id);
+            } else {
+                // ยกเลิกทั้งหมด - ล้างรายการ
+                additionalSelectedUsers = [];
+            }
+
+            updateAdditionalUsersDisplay();
+            updateUserSelectionListCheckboxes(); // อัพเดท checkbox และ class
+        }
+
+        // ฟังก์ชันตรวจสอบและอัพเดทสถานะ "เลือกทั้งหมด"
+        function updateSelectAllCheckbox() {
+            const selectAllCheckbox = document.getElementById('selectAllUsers');
+
+            // ถ้าเลือกครบทุกคน ให้ check "เลือกทั้งหมด"
+            if (additionalSelectedUsers.length === users.length && users.length > 0) {
+                selectAllCheckbox.checked = true;
+            } else {
+                selectAllCheckbox.checked = false;
+            }
+        }
+
+        // ฟังก์ชันอัพเดท checkbox และ class selected ใน userSelectionList
+        function updateUserSelectionListCheckboxes() {
+            users.forEach(user => {
+                // หา user-selection-item
+                const items = document.querySelectorAll('.user-selection-item');
+
+                items.forEach(item => {
+                    // เช็คว่า item นี้เป็นของ user คนไหน (ดูจาก onclick attribute)
+                    const onclickAttr = item.getAttribute('onclick');
+                    if (onclickAttr && onclickAttr.includes(`toggleUserSelection(${user.id})`)) {
+                        const checkbox = item.querySelector('.user-checkbox');
+
+                        if (additionalSelectedUsers.includes(user.id)) {
+                            // เลือกแล้ว
+                            item.classList.add('selected');
+                            if (checkbox) checkbox.checked = true;
+                        } else {
+                            // ยังไม่เลือก
+                            item.classList.remove('selected');
+                            if (checkbox) checkbox.checked = false;
+                        }
+                    }
+                });
+            });
+        }
+
+
         function toggleUserSelection(userId) {
             const index = additionalSelectedUsers.indexOf(userId);
 
             if (index > -1) {
+                // ถ้ามีอยู่แล้ว ให้ลบออก
                 additionalSelectedUsers.splice(index, 1);
             } else {
+                // ถ้ายังไม่มี ให้เพิ่มเข้าไป
                 additionalSelectedUsers.push(userId);
             }
 
             updateAdditionalUsersDisplay();
-            renderUserList(filterUsersBySearch());
+            updateUserSelectionListCheckboxes(); // อัพเดท checkbox และ class
+            updateSelectAllCheckbox(); // เช็คว่าต้องอัพเดท "เลือกทั้งหมด" หรือไม่
         }
 
         function updateAdditionalUsersDisplay() {
@@ -1344,6 +1466,27 @@
 
             // อัพเดท hidden input
             document.getElementById('additionalUsersInput').value = JSON.stringify(additionalSelectedUsers);
+        }
+
+        // ฟังก์ชันสร้างรายการผู้ใช้
+        function updateUserSelectionList(userList = users) {
+            const container = document.getElementById('userSelectionList');
+
+            container.innerHTML = userList.map(user => `
+                <div class="user-selection-item ${additionalSelectedUsers.includes(user.id) ? 'selected' : ''}" 
+                     onclick="toggleUserSelection(${user.id})">
+                    <input type="checkbox" class="user-checkbox" 
+                           ${additionalSelectedUsers.includes(user.id) ? 'checked' : ''}
+                           onclick="event.stopPropagation(); toggleUserSelection(${user.id})">
+                    <div class="user-selection-avatar">${user.avatar}</div>
+                    <div class="user-selection-info">
+                        <div class="user-selection-name">${user.name}</div>
+                        <div class="user-selection-role">${user.role}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            updateSelectAllCheckbox(); // อัพเดทสถานะ "เลือกทั้งหมด"
         }
 
         document.getElementById('userSearchInput').addEventListener('input', function() {
