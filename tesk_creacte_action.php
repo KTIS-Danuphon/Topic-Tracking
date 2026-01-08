@@ -1,5 +1,4 @@
 <?php
-session_start();
 include 'session_check.php';
 date_default_timezone_set('Asia/Bangkok');
 
@@ -7,103 +6,71 @@ require_once 'class/crud.class.php';
 require_once 'class/util.class.php';
 require_once 'class/encrypt.class.php';
 
-$object = new CRUD();
-$util = new Util();
-$Encrypt = new Encrypt_data();
+$object   = new CRUD();
+$util     = new Util();
+$Encrypt  = new Encrypt_data();
 $now = new DateTime();
 $formatted_now = $now->format('Y-m-d H:i:s');
 
-// Initialize response variables
-$iconType = 'error';
-$taskID = null;
-$errorMessage = '';
+// รับข้อมูลจาก POST (ถ้ามี)
+$formData = isset($_POST) ? $_POST : [];
 
-try {
-    // ตรวจสอบว่ามีข้อมูล POST
-    if (empty($_POST)) {
-        header('Location: task_create.php');
-        exit();
+// ถ้าไม่มีข้อมูลให้กลับไปหน้าแรก
+if (empty($formData)) {
+    header('Location: tesk_create.php');
+    exit();
+}
+
+$taskTitle = $util->testInput($formData['taskTitle']); // หัวข้อเรื่อง
+$taskCategory = $util->testInput($formData['taskCategory']); // หมวดหมู่
+$taskDescription = $util->testInput($formData['taskDescription']); // รายละเอียด
+$taskStatus = $util->testInput($formData['taskStatus']); // สถานะ
+$taskDueDate = $util->testInput($formData['taskDueDate']); // กำหนดวันครบกำหนด
+$taskImportance = $util->testInput($formData['taskImportance']); // ความสำคัญ ดาว
+$mentionedUsers = $formData['mentionedUsers']; // ผู้ที่ถูกกล่าวถึง
+$additionalUsers = $formData['additionalUsers']; // ผู้เข้าร่วมเพิ่มเติม
+$createdBy = $_SESSION['user_id']; // ผู้สร้างงาน (จาก session)
+
+// $password  = $Encrypt->EnCrypt_pass($util->testInput($_POST['password']));
+$table = 'tb_topics_c050968';
+$fields = 'fd_topic_id, fd_topic_title, fd_topic_category, fd_topic_created_at';
+$where = 'WHERE fd_topic_title = "' . $taskTitle . '" AND fd_topic_category = "' . $taskCategory . '" AND fd_topic_created_at = "' . $formatted_now . '"';
+$result_task = $object->ReadData($table, $fields, $where);
+$iconType = 'warning';
+if (!empty($result_task)) {
+    // พบข้อมูลซ้ำ
+    $taskID = $result_task[0]['fd_topic_id'];
+    $iconType = 'warning';
+    $errorMessage = 'พบข้อมูลซ้ำในระบบ';
+} else {
+    // บันทึกข้อมูลใหม่
+    $fields_data = [
+        'fd_topic_title' => $taskTitle,
+        'fd_topic_category' => $taskCategory,
+        'fd_topic_detail' => $taskDescription,
+        'fd_topic_mentioned' => $mentionedUsers,
+        'fd_topic_status' => $taskStatus,
+        'fd_topic_participant' => $additionalUsers,
+        'fd_topic_created_by' => $createdBy,
+        'fd_topic_importance' => $taskImportance,
+        'fd_topic_private' => '1',
+        'fd_topic_active' => '1',
+        'fd_topic_created_at' => $formatted_now,
+        'fd_topic_updated_at' => $formatted_now,
+    ];
+
+    $taskID = $object->Insert_Data($table, $fields_data);
+
+    if (!$taskID) {
+        throw new Exception('ไม่สามารถบันทึกข้อมูลได้');
     }
 
-    // Validate และ sanitize input
-    $taskTitle = $util->testInput($_POST['taskTitle'] ?? '');
-    $taskCategory = $util->testInput($_POST['taskCategory'] ?? '');
-    $taskDescription = $util->testInput($_POST['taskDescription'] ?? '');
-    $taskStatus = $util->testInput($_POST['taskStatus'] ?? 'pending');
-    $taskDueDate = $util->testInput($_POST['taskDueDate'] ?? '');
-    $taskImportance = $util->testInput($_POST['taskImportance'] ?? '1');
-    $mentionedUsers = $_POST['mentionedUsers'] ?? '';
-    $additionalUsers = $_POST['additionalUsers'] ?? '';
-    $createdBy = $_SESSION['user_id'] ?? null;
-
-    // Validation
-    if (empty($taskTitle)) {
-        throw new Exception('กรุณาระบุหัวข้อเรื่อง');
-    }
-    if (strlen($taskTitle) > 200) {
-        throw new Exception('หัวข้อเรื่องยาวเกินไป');
-    }
-    if (empty($taskCategory)) {
-        throw new Exception('กรุณาเลือกหมวดหมู่');
-    }
-    if (empty($createdBy)) {
-        throw new Exception('ไม่พบข้อมูล session ผู้ใช้');
-    }
-
-    // ตรวจสอบข้อมูลซ้ำ (ไม่ใช้ created_at ในการเช็ค)
-    $table = 'tb_topics_c050968';
-    $fields = 'fd_topic_id';
-    
-    // เช็คข้อมูลที่สร้างภายใน 5 นาทีที่ผ่านมา
-    $five_minutes_ago = (new DateTime())->modify('-5 minutes')->format('Y-m-d H:i:s');
-    $where = "WHERE fd_topic_title = ? 
-              AND fd_topic_category = ? 
-              AND fd_topic_created_by = ? 
-              AND fd_topic_created_at >= ?";
-    
-    // ใช้ prepared statement (สมมติว่า CRUD class รองรับ)
-    $params = [$taskTitle, $taskCategory, $createdBy, $five_minutes_ago];
-    $result_task = $object->ReadData($table, $fields, $where, $params);
-
-    if (!empty($result_task)) {
-        // พบข้อมูลซ้ำ
-        $taskID = $result_task[0]['fd_topic_id'];
-        $iconType = 'warning';
-        $errorMessage = 'พบข้อมูลซ้ำในระบบ';
-    } else {
-        // บันทึกข้อมูลใหม่
-        $fields_data = [
-            'fd_topic_title' => $taskTitle,
-            'fd_topic_category' => $taskCategory,
-            'fd_topic_detail' => $taskDescription,
-            'fd_topic_mentioned' => $mentionedUsers,
-            'fd_topic_status' => $taskStatus,
-            'fd_topic_participant' => $additionalUsers,
-            'fd_topic_created_by' => $createdBy,
-            'fd_topic_importance' => $taskImportance,
-            'fd_topic_private' => '1',
-            'fd_topic_active' => '1',
-            'fd_topic_created_at' => $formatted_now,
-            'fd_topic_updated_at' => $formatted_now,
-        ];
-
-        $taskID = $object->Insert_Data($table, $fields_data);
-        
-        if (!$taskID) {
-            throw new Exception('ไม่สามารถบันทึกข้อมูลได้');
-        }
-
-        $iconType = 'success';
-    }
-
-} catch (Exception $e) {
-    $iconType = 'error';
-    $errorMessage = $e->getMessage();
-    error_log("Task Save Error: " . $e->getMessage());
+    $iconType = 'success';
 }
 ?>
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -112,7 +79,6 @@ try {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
-        /* คงสไตล์เดิมทั้งหมด */
         :root {
             --success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
             --success-color: #10b981;
@@ -141,10 +107,21 @@ try {
             transition: background 0.6s ease;
         }
 
-        body.success { background: var(--success-gradient); }
-        body.info { background: var(--info-gradient); }
-        body.warning { background: var(--warning-gradient); }
-        body.error { background: var(--error-gradient); }
+        body.success {
+            background: var(--success-gradient);
+        }
+
+        body.info {
+            background: var(--info-gradient);
+        }
+
+        body.warning {
+            background: var(--warning-gradient);
+        }
+
+        body.error {
+            background: var(--error-gradient);
+        }
 
         .saving-container {
             text-align: center;
@@ -157,6 +134,7 @@ try {
                 opacity: 0;
                 transform: translateY(-20px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -180,10 +158,13 @@ try {
         }
 
         @keyframes pulse {
-            0%, 100% {
+
+            0%,
+            100% {
                 transform: scale(1);
                 opacity: 1;
             }
+
             50% {
                 transform: scale(1.1);
                 opacity: 0.5;
@@ -206,14 +187,18 @@ try {
         }
 
         @keyframes bounce {
-            0%, 100% {
+
+            0%,
+            100% {
                 transform: translateY(0);
             }
+
             50% {
                 transform: translateY(-10px);
             }
         }
 
+        /* Result Circle & Icon Base */
         .result-circle {
             width: 100%;
             height: 100%;
@@ -235,20 +220,13 @@ try {
             opacity: 0;
         }
 
-        .state-success .result-circle,
-        .state-info .result-circle,
-        .state-warning .result-circle,
-        .state-error .result-circle {
+        /* Success Animation */
+        .state-success .result-circle {
             animation: scaleInCircle 0.3s ease-out forwards;
         }
 
         .state-success .result-icon {
             animation: scaleIn 0.3s ease-out 0.2s forwards;
-        }
-
-        .state-warning .result-icon,
-        .state-error .result-icon {
-            animation: scaleInShake 0.6s ease-out 0.2s forwards;
         }
 
         @keyframes scaleInCircle {
@@ -265,30 +243,128 @@ try {
             }
         }
 
+        /* Info Animation */
+        .state-info .result-circle {
+            animation: scaleInCircle 0.3s ease-out forwards;
+        }
+
+        .state-info .result-icon {
+            animation: scaleInBounce 0.5s ease-out 0.2s forwards;
+        }
+
+        @keyframes scaleInBounce {
+            0% {
+                transform: translate(-50%, -50%) scale(0);
+                opacity: 0;
+            }
+
+            50% {
+                transform: translate(-50%, -50%) scale(1.2);
+                opacity: 1;
+            }
+
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Warning Animation */
+        .state-warning .result-circle {
+            animation: scaleInCircle 0.3s ease-out forwards;
+        }
+
+        .state-warning .result-icon {
+            animation: scaleInShake 0.6s ease-out 0.2s forwards;
+        }
+
         @keyframes scaleInShake {
             0% {
                 transform: translate(-50%, -50%) scale(0);
                 opacity: 0;
             }
+
             40% {
                 transform: translate(-50%, -50%) scale(1.1);
                 opacity: 1;
             }
+
             50% {
                 transform: translate(-50%, -50%) scale(1.1) rotate(-5deg);
             }
+
             60% {
                 transform: translate(-50%, -50%) scale(1.1) rotate(5deg);
             }
+
             70% {
                 transform: translate(-50%, -50%) scale(1.1) rotate(-5deg);
             }
+
             80% {
                 transform: translate(-50%, -50%) scale(1.1) rotate(5deg);
             }
+
             100% {
                 transform: translate(-50%, -50%) scale(1);
                 opacity: 1;
+            }
+        }
+
+        /* Error Animation */
+        .state-error .result-circle {
+            animation: scaleInCircle 0.3s ease-out forwards;
+        }
+
+        .state-error .result-icon {
+            animation: scaleInShake 0.5s ease-out 0.2s forwards;
+        }
+
+        /* Error X Mark */
+        .error-x {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+        }
+
+        .state-error .error-x {
+            animation: fadeIn 0.3s ease-out 0.5s forwards;
+        }
+
+        .error-x::before,
+        .error-x::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 4px;
+            background: white;
+            border-radius: 2px;
+        }
+
+        .error-x::before {
+            transform: translate(-50%, -50%) rotate(45deg);
+        }
+
+        .error-x::after {
+            transform: translate(-50%, -50%) rotate(-45deg);
+        }
+
+        .state-error .error-x::before {
+            animation: drawLine 0.3s ease-out 0.6s forwards;
+        }
+
+        .state-error .error-x::after {
+            animation: drawLine 0.3s ease-out 0.7s forwards;
+        }
+
+        @keyframes drawLine {
+            to {
+                width: 60%;
             }
         }
 
@@ -303,9 +379,12 @@ try {
         }
 
         @keyframes fadeInOut {
-            0%, 100% {
+
+            0%,
+            100% {
                 opacity: 1;
             }
+
             50% {
                 opacity: 0.7;
             }
@@ -335,9 +414,13 @@ try {
         }
 
         @keyframes blink {
-            0%, 80%, 100% {
+
+            0%,
+            80%,
+            100% {
                 opacity: 0;
             }
+
             40% {
                 opacity: 1;
             }
@@ -381,6 +464,11 @@ try {
             color: var(--success-color);
         }
 
+        body.info .step.active .step-icon,
+        body.info .step.completed .step-icon {
+            color: var(--info-color);
+        }
+
         body.warning .step.active .step-icon,
         body.warning .step.completed .step-icon {
             color: var(--warning-color);
@@ -393,6 +481,27 @@ try {
 
         .step.completed .step-icon {
             background: white;
+        }
+
+        .step.error-step .step-icon {
+            background: white;
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            25% {
+                transform: translateX(-5px);
+            }
+
+            75% {
+                transform: translateX(5px);
+            }
         }
 
         .step-label {
@@ -420,23 +529,155 @@ try {
             transition: width 0.5s ease;
         }
 
-        .step.completed + .step-connector .step-connector-progress {
+        .step.completed+.step-connector .step-connector-progress {
             width: 100%;
         }
 
-        .error-message {
-            margin-top: 1rem;
-            padding: 1rem;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 10px;
-            font-size: 0.9rem;
+        /* Result Actions */
+        .result-actions {
+            margin-top: 2rem;
             display: none;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            animation: slideUp 0.5s ease-out;
         }
 
-        .error-message.show {
+        .result-actions.show {
+            display: flex;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .btn-action {
+            padding: 0.875rem 1.75rem;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .btn-primary-white {
+            background: white;
+            color: var(--error-color);
+        }
+
+        body.success .btn-primary-white {
+            color: var(--success-color);
+        }
+
+        body.info .btn-primary-white {
+            color: var(--info-color);
+        }
+
+        body.warning .btn-primary-white {
+            color: var(--warning-color);
+        }
+
+        .btn-primary-white:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .btn-outline:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: white;
+            transform: translateY(-2px);
+        }
+
+        /* Result Details */
+        .result-details {
+            margin-top: 1.5rem;
+            padding: 1.25rem;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            display: none;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        .result-details.show {
             display: block;
         }
 
+        .result-message {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 0.5rem;
+        }
+
+        .result-code {
+            font-size: 0.8rem;
+            opacity: 0.7;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Test Buttons */
+        .test-buttons {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .test-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            color: white;
+        }
+
+        .test-btn.btn-success {
+            background: var(--success-color);
+        }
+
+        .test-btn.btn-info {
+            background: var(--info-color);
+        }
+
+        .test-btn.btn-warning {
+            background: var(--warning-color);
+        }
+
+        .test-btn.btn-error {
+            background: var(--error-color);
+        }
+
+        .test-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Floating particles effect */
         .particle {
             position: absolute;
             width: 6px;
@@ -448,49 +689,163 @@ try {
         }
 
         @keyframes float {
-            0%, 100% {
+
+            0%,
+            100% {
                 transform: translateY(0) translateX(0) rotate(0deg);
                 opacity: 0.4;
             }
+
             50% {
                 transform: translateY(-120px) translateX(80px) rotate(180deg);
                 opacity: 0;
             }
         }
 
-        .particle:nth-child(1) { left: 15%; animation-delay: 0s; animation-duration: 4s; }
-        .particle:nth-child(2) { left: 35%; animation-delay: 0.5s; animation-duration: 5s; }
-        .particle:nth-child(3) { left: 55%; animation-delay: 1s; animation-duration: 4.5s; }
-        .particle:nth-child(4) { left: 75%; animation-delay: 1.5s; animation-duration: 5.5s; }
+        .particle:nth-child(1) {
+            left: 15%;
+            animation-delay: 0s;
+            animation-duration: 4s;
+        }
+
+        .particle:nth-child(2) {
+            left: 35%;
+            animation-delay: 0.5s;
+            animation-duration: 5s;
+        }
+
+        .particle:nth-child(3) {
+            left: 55%;
+            animation-delay: 1s;
+            animation-duration: 4.5s;
+        }
+
+        .particle:nth-child(4) {
+            left: 75%;
+            animation-delay: 1.5s;
+            animation-duration: 5.5s;
+        }
+
+        .particle:nth-child(5) {
+            left: 25%;
+            animation-delay: 2s;
+            animation-duration: 4s;
+        }
+
+        .particle:nth-child(6) {
+            left: 65%;
+            animation-delay: 2.5s;
+            animation-duration: 5s;
+        }
+
+        .particle:nth-child(7) {
+            left: 45%;
+            animation-delay: 3s;
+            animation-duration: 4.5s;
+        }
+
+        .particle:nth-child(8) {
+            left: 85%;
+            animation-delay: 3.5s;
+            animation-duration: 5.5s;
+        }
 
         @media (max-width: 576px) {
             .saving-text {
                 font-size: 1.5rem;
             }
+
+            .saving-subtext {
+                font-size: 0.9rem;
+            }
+
             .saving-icon-wrapper {
                 width: 80px;
                 height: 80px;
             }
+
+            .saving-icon i {
+                font-size: 2.5rem;
+            }
+
+            .result-icon {
+                font-size: 3rem;
+            }
+
+            .progress-steps {
+                gap: 0.5rem;
+                flex-wrap: wrap;
+            }
+
             .step-connector {
                 width: 40px;
+            }
+
+            .step-icon {
+                width: 35px;
+                height: 35px;
+                font-size: 1rem;
+            }
+
+            .step-label {
+                font-size: 0.75rem;
+            }
+
+            .result-actions {
+                flex-direction: column;
+                width: 100%;
+                padding: 0 1rem;
+            }
+
+            .btn-action {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .test-buttons {
+                top: 10px;
+                right: 10px;
+                gap: 6px;
+            }
+
+            .test-btn {
+                padding: 6px 12px;
+                font-size: 0.75rem;
             }
         }
     </style>
 </head>
+
 <body>
+    <!-- Test Buttons -->
+    <!-- <div class="test-buttons">
+        <button class="test-btn btn-success" onclick="testResult('success')">✓ Success</button>
+        <button class="test-btn btn-info" onclick="testResult('info')">ℹ Info</button>
+        <button class="test-btn btn-warning" onclick="testResult('warning')">⚠ Warning</button>
+        <button class="test-btn btn-error" onclick="testResult('error')">✕ Error</button>
+    </div> -->
+
+    <!-- Floating particles -->
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
     <div class="particle"></div>
     <div class="particle"></div>
     <div class="particle"></div>
     <div class="particle"></div>
 
+    <!-- Saving Container -->
     <div class="saving-container">
         <div class="saving-icon-wrapper">
             <div class="circle-bg"></div>
             <div class="saving-icon">
                 <i class="bi bi-cloud-arrow-up"></i>
             </div>
+            <!-- Result Elements -->
             <div class="result-circle"></div>
             <i class="result-icon bi bi-check-circle-fill"></i>
+            <div class="error-x"></div>
         </div>
 
         <h2 class="saving-text loading">
@@ -502,10 +857,7 @@ try {
 
         <p class="saving-subtext" id="savingSubtext">กรุณารอสักครู่</p>
 
-        <div class="error-message" id="errorMessage">
-            <?php echo htmlspecialchars($errorMessage); ?>
-        </div>
-
+        <!-- Progress Steps -->
         <div class="progress-steps">
             <div class="step active" id="step1">
                 <div class="step-icon">
@@ -536,82 +888,154 @@ try {
                 <div class="step-label">บันทึกสำเร็จ</div>
             </div>
         </div>
+
+        <!-- Result Details (Hidden by default) -->
+        <!-- <div class="result-details" id="resultDetails">
+            <div class="result-message" id="resultMessage">
+                ข้อความแจ้งเตือน
+            </div>
+            <div class="result-code" id="resultCode">
+                รหัส: CODE_001
+            </div>
+        </div> -->
+
+        <!-- Result Actions (Hidden by default) -->
+        <!-- <div class="result-actions" id="resultActions">
+            <button class="btn-action btn-primary-white" onclick="handlePrimaryAction()">
+                <i class="bi bi-arrow-left"></i>
+                <span id="primaryBtnText">ดำเนินการต่อ</span>
+            </button>
+            <a href="index.php" class="btn-action btn-outline">
+                <i class="bi bi-house"></i>
+                กลับหน้าแรก
+            </a>
+        </div> -->
     </div>
 
     <script>
         const iconType = '<?php echo $iconType; ?>';
-        const taskID = <?php echo $taskID ? "'$taskID'" : 'null'; ?>;
-        const errorMessage = '<?php echo addslashes($errorMessage); ?>';
 
+        // Configuration for each state
         const stateConfig = {
             success: {
                 icon: 'bi-check-circle-fill',
                 title: 'บันทึกข้อมูลสำเร็จ',
                 subtitle: 'ข้อมูลของคุณถูกบันทึกเรียบร้อยแล้ว',
-                stepLabel: 'บันทึกสำเร็จ'
+                message: 'การบันทึกข้อมูลเสร็จสมบูรณ์',
+                code: 'SUCCESS_200',
+                stepLabel: 'บันทึกสำเร็จ',
+                primaryBtn: 'ดูรายละเอียด',
+                primaryIcon: 'bi-eye'
+            },
+            info: {
+                icon: 'bi-info-circle-fill',
+                title: 'ข้อมูลสำคัญ',
+                subtitle: 'มีข้อมูลที่ต้องการแจ้งให้คุณทราบ',
+                message: 'กรุณาตรวจสอบข้อมูลก่อนดำเนินการต่อ',
+                code: 'INFO_100',
+                stepLabel: 'ข้อมูลเพิ่มเติม',
+                primaryBtn: 'รับทราบ',
+                primaryIcon: 'bi-check-lg'
             },
             warning: {
                 icon: 'bi-exclamation-triangle-fill',
                 title: 'คำเตือน!',
                 subtitle: 'พบข้อมูลซ้ำในระบบ',
-                stepLabel: 'ตรวจพบคำเตือน'
+                message: 'มีบางข้อมูลที่อาจต้องแก้ไข แต่สามารถดำเนินการต่อได้',
+                code: 'WARNING_300',
+                stepLabel: 'ตรวจพบคำเตือน',
+                primaryBtn: 'ดำเนินการต่อ',
+                primaryIcon: 'bi-arrow-right'
             },
             error: {
                 icon: 'bi-exclamation-circle-fill',
                 title: 'เกิดข้อผิดพลาด!',
                 subtitle: 'ไม่สามารถบันทึกข้อมูลได้',
-                stepLabel: 'เกิดข้อผิดพลาด'
+                message: 'เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง',
+                code: 'ERROR_500',
+                stepLabel: 'เกิดข้อผิดพลาด',
+                primaryBtn: 'ลองอีกครั้ง',
+                primaryIcon: 'bi-arrow-clockwise'
             }
         };
 
+        // ฟังก์ชันแสดงผลลัพธ์
         function showResult(type) {
+            console.log('Showing result for type:', type);
             const config = stateConfig[type];
             if (!config) return;
 
+            // เปลี่ยนสีพื้นหลัง
             document.body.className = type;
+
+            // ซ่อน loading elements
             document.querySelector('.circle-bg').style.display = 'none';
             document.querySelector('.saving-icon').style.display = 'none';
             document.querySelector('.saving-dots').style.display = 'none';
             document.querySelector('.saving-text').classList.remove('loading');
 
+            // แสดง result icon
             const wrapper = document.querySelector('.saving-icon-wrapper');
             wrapper.className = 'saving-icon-wrapper state-' + type;
 
             const resultIcon = document.querySelector('.result-icon');
             resultIcon.className = 'result-icon ' + config.icon;
 
+            // เปลี่ยนข้อความ
             document.getElementById('savingText').textContent = config.title;
             document.getElementById('savingSubtext').textContent = config.subtitle;
 
+            // แสดงรายละเอียด
+            // document.getElementById('resultMessage').textContent = config.message;
+            // document.getElementById('resultCode').textContent = `รหัส: ${config.code}`;
+            // document.getElementById('resultDetails').classList.add('show');
+
+            // แสดงปุ่ม action
+            // document.getElementById('primaryBtnText').textContent = config.primaryBtn;
+            // document.querySelector('#resultActions .btn-primary-white i').className = config.primaryIcon;
+            // document.getElementById('resultActions').classList.add('show');
+
+            // อัพเดท step
             const step3 = document.getElementById('step3');
             step3.querySelector('.step-label').textContent = config.stepLabel;
-
-            if (type === 'error' && errorMessage) {
-                document.getElementById('errorMessage').classList.add('show');
+            if (type === 'error' || type === 'warning') {
+                step3.classList.add('error-step');
             }
         }
 
-        async function savingProcess() {
+        // ฟังก์ชันจำลองการบันทึก
+        async function savingProcess(forceType = null) {
             try {
+                // Step 1: ตรวจสอบข้อมูล
                 await new Promise(resolve => setTimeout(resolve, 500));
                 document.getElementById('step1').classList.add('completed');
                 document.getElementById('step2').classList.add('active');
 
+                // Step 2: อัพโหลดข้อมูล
                 await new Promise(resolve => setTimeout(resolve, 500));
                 document.getElementById('step2').classList.add('completed');
                 document.getElementById('step3').classList.add('active');
 
+                // Step 3: แสดงผลลัพธ์
                 await new Promise(resolve => setTimeout(resolve, 500));
 
-                showResult(iconType);
+                // ใช้ type ที่กำหนดหรือสุ่ม
+                let resultType = forceType;
+                if (!resultType) {
+                    const types = ['success', 'info', 'warning', 'error'];
+                    const random = Math.random();
+                    if (random < 0.5) resultType = 'success';
+                    else if (random < 0.7) resultType = 'info';
+                    else if (random < 0.85) resultType = 'warning';
+                    else resultType = 'error';
+                }
 
-                if (iconType === 'success' || iconType === 'warning') {
-                    await new Promise(resolve => setTimeout(resolve, 1500));
-                    if (taskID) {
-                        window.location.href = 'task_detail.php?taskID=' + taskID;
-                    } else {
-                        window.location.href = 'index.php';
-                    }
+                showResult(resultType);
+
+                // Auto redirect สำหรับ success (ถ้าต้องการ)
+                if (resultType === 'success' || resultType === 'warning') {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    window.location.href = 'task_detail.php';
                 }
 
             } catch (error) {
@@ -620,7 +1044,80 @@ try {
             }
         }
 
-        savingProcess();
+        // ฟังก์ชัน handle primary action
+        function handlePrimaryAction() {
+            const currentState = document.body.className;
+
+            if (currentState === 'success') {
+                window.location.href = 'task_detail.php';
+            } else if (currentState === 'info' || currentState === 'warning') {
+                window.location.href = 'index.php';
+            } else if (currentState === 'error') {
+                window.history.back();
+            }
+        }
+
+        // ฟังก์ชันทดสอบ
+        function testResult(type) {
+            savingProcess(type);
+            // Reset หน้า
+            // window.location.href = 'task_saving.php?type=' + type;
+        }
+
+        // เริ่มกระบวนการ
+        if (iconType) {
+            console.log('Using predefined icon type:', iconType);
+            savingProcess(iconType);
+        } else {
+            savingProcess();
+        }
+
+        /*
+        // สำหรับ API จริง:
+        async function saveTaskData() {
+            try {
+                document.getElementById('step1').classList.add('active');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                document.getElementById('step1').classList.add('completed');
+                document.getElementById('step2').classList.add('active');
+                
+                const formData = new FormData();
+                <?php if (!empty($formData)): ?>
+                <?php foreach ($formData as $key => $value): ?>
+                formData.append('<?php echo $key; ?>', '<?php echo htmlspecialchars($value, ENT_QUOTES); ?>');
+                <?php endforeach; ?>
+                <?php endif; ?>
+                
+                const response = await fetch('api/save_task.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                document.getElementById('step2').classList.add('completed');
+                document.getElementById('step3').classList.add('active');
+                
+                if (result.success) {
+                    showResult('success');
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    window.location.href = `task_detail.php?taskID=${result.taskID}`;
+                } else if (result.warning) {
+                    showResult('warning');
+                } else {
+                    throw new Error(result.message || 'เกิดข้อผิดพลาด');
+                }
+                
+            } catch (error) {
+                console.error('Save error:', error);
+                showResult('error');
+            }
+        }
+        
+        saveTaskData();
+        */
     </script>
 </body>
+
 </html>
