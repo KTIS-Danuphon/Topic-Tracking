@@ -1,0 +1,1634 @@
+<?php include 'session_check.php'; ?>
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>จัดการผู้ใช้ - Topic Tracking</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --sidebar-width: 260px;
+            --navbar-height: 70px;
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            overflow-x: hidden;
+        }
+
+        /* Top Navbar */
+        .top-navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--navbar-height);
+            background: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+        }
+
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .navbar-brand i {
+            font-size: 1.8rem;
+            -webkit-text-fill-color: var(--primary-color);
+        }
+
+        .navbar-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .notification-btn {
+            position: relative;
+            background: transparent;
+            border: none;
+            font-size: 1.3rem;
+            color: #64748b;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .notification-btn:hover {
+            background: #f1f5f9;
+            color: var(--primary-color);
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: #ef4444;
+            color: white;
+            font-size: 0.65rem;
+            padding: 0.15rem 0.4rem;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+
+        .user-profile:hover {
+            background: #f1f5f9;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #1e293b;
+        }
+
+        .user-role {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: var(--navbar-height);
+            bottom: 0;
+            width: var(--sidebar-width);
+            background: white;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
+            z-index: 999;
+            overflow-y: auto;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-header {
+            padding: 2rem 1.5rem 1rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .sidebar-title {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #94a3b8;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 1rem 0;
+        }
+
+        .menu-item {
+            margin-bottom: 0.25rem;
+        }
+
+        .menu-link {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.875rem 1.5rem;
+            color: #64748b;
+            text-decoration: none;
+            transition: all 0.3s;
+            position: relative;
+            font-weight: 500;
+        }
+
+        .menu-link:hover {
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.1) 0%, transparent 100%);
+            color: var(--primary-color);
+        }
+
+        .menu-link.active {
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.15) 0%, transparent 100%);
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .menu-link.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--primary-gradient);
+            border-radius: 0 4px 4px 0;
+        }
+
+        .menu-link i {
+            font-size: 1.2rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        .menu-badge {
+            margin-left: auto;
+            background: #fee2e2;
+            color: #dc2626;
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+
+        .sidebar-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 1.5rem;
+            border-top: 1px solid #e2e8f0;
+            background: white;
+        }
+
+        .logout-btn {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            width: 100%;
+            padding: 0.875rem 1.5rem;
+            background: transparent;
+            border: 1px solid #e2e8f0;
+            color: #64748b;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .logout-btn:hover {
+            background: #fef2f2;
+            border-color: #fecaca;
+            color: #dc2626;
+        }
+
+        .logout-btn i {
+            font-size: 1.2rem;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            margin-top: var(--navbar-height);
+            padding: 2rem;
+            min-height: calc(100vh - var(--navbar-height));
+            transition: all 0.3s ease;
+        }
+
+        /* Mobile Toggle */
+        .mobile-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            font-size: 1.5rem;
+            color: #64748b;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+
+        /* Responsive */
+        /* //!มือถือ */
+        @media (max-width: 576px) {
+            .main-content {
+                margin-left: 0;
+                padding: 1rem;
+                /* overflow-x: hidden; */
+            }
+
+            .main-content .container-fluid {
+                padding-left: 0;
+                padding-right: 0;
+            }
+        }
+
+        @media (max-width: 992px) {
+            .sidebar {
+                left: calc(var(--sidebar-width) * -1);
+            }
+
+            .sidebar.show {
+                left: 0;
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .mobile-toggle {
+                display: block;
+            }
+
+            .user-info {
+                display: none;
+            }
+
+            .top-navbar {
+                padding: 0 1rem;
+            }
+        }
+
+        /* Overlay for mobile */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: var(--navbar-height);
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 998;
+        }
+
+        .sidebar-overlay.show {
+            display: block;
+        }
+    </style>
+    <style>
+        .page-container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 0.5rem;
+        }
+
+        .stats-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            margin-bottom: 2rem;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 1rem;
+        }
+
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 1rem;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+        }
+
+        .stat-icon.admin {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .stat-icon.user {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            color: white;
+        }
+
+        .stat-icon.executive {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+        }
+
+        .stat-icon.active {
+            background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+            color: white;
+        }
+
+        .stat-icon.inactive {
+            background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+            color: white;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .stat-label {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        .search-bar {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .user-table-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        .user-table {
+            margin-bottom: 0;
+        }
+
+        .user-table thead {
+            background: var(--primary-gradient);
+            color: white;
+        }
+
+        .user-table thead th {
+            border: none;
+            padding: 1rem;
+            font-weight: 600;
+            white-space: nowrap;
+            font-size: 0.9rem;
+        }
+
+        .user-table tbody tr {
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .user-table tbody tr:hover {
+            background: #f8fafc;
+        }
+
+        .user-table tbody tr.current-user {
+            background: rgba(102, 126, 234, 0.05);
+            font-weight: 500;
+        }
+
+        .user-table tbody td {
+            padding: 1rem;
+            vertical-align: middle;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .table-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+            background: var(--primary-gradient);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .user-name-cell {
+            font-weight: 600;
+            color: #1e293b;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .user-name-cell:hover {
+            overflow: visible;
+            white-space: normal;
+            word-break: break-word;
+        }
+
+        .user-email-cell {
+            color: #64748b;
+            font-size: 0.9rem;
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .user-email-cell:hover {
+            overflow: visible;
+            white-space: normal;
+            word-break: break-all;
+        }
+
+        .text-truncate-custom {
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: inline-block;
+        }
+
+        .pagination-container {
+            background: white;
+            border-radius: 0 0 16px 16px;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .pagination-info {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+
+        .pagination {
+            margin: 0;
+        }
+
+        .page-link {
+            border-radius: 8px;
+            margin: 0 0.25rem;
+            border: 2px solid #e2e8f0;
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .page-link:hover {
+            background: rgba(102, 126, 234, 0.1);
+            border-color: var(--primary-color);
+        }
+
+        .page-item.active .page-link {
+            background: var(--primary-gradient);
+            border-color: transparent;
+        }
+
+        .page-item.disabled .page-link {
+            background: #f8fafc;
+            border-color: #e2e8f0;
+            color: #94a3b8;
+        }
+
+        .items-per-page {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .items-per-page select {
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .badge-role {
+            padding: 0.35rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .badge-role.admin {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-role.user {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-role.executive {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-status {
+            padding: 0.35rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .badge-status.active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-status.inactive {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .you-badge {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 0.25rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .action-btn-group {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: center;
+        }
+
+        .btn-action-sm {
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            transition: all 0.3s;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #94a3b8;
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 1200px) {
+
+            .user-table thead th:nth-child(3),
+            .user-table tbody td:nth-child(3) {
+                display: none;
+            }
+        }
+
+        @media (max-width: 992px) {
+
+            .user-table thead th:nth-child(2),
+            .user-table tbody td:nth-child(2) {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+
+            .user-table thead th:nth-child(4),
+            .user-table tbody td:nth-child(4) {
+                display: none;
+            }
+
+            .user-table-container {
+                overflow-x: auto;
+            }
+
+            .user-table {
+                min-width: 800px;
+            }
+        }
+
+        .modal-content {
+            border-radius: 16px;
+            border: none;
+        }
+
+        .modal-header {
+            background: var(--primary-gradient);
+            color: white;
+            border-radius: 16px 16px 0 0;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #475569;
+        }
+
+        .form-control,
+        .form-select {
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            padding: 0.75rem;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+        }
+
+        .alert-info-custom {
+            background: #e0e7ff;
+            border: 1px solid #c7d2fe;
+            color: #4338ca;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .user-header {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .user-details {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <?php include 'menu.php'; ?>
+
+    <main class="main-content">
+        <div class="container-fluid">
+            <div class="page-header">
+                <h1 class="page-title">
+                    <i class="bi bi-people me-2" style="color: var(--primary-color);"></i>
+                    จัดการผู้ใช้
+                </h1>
+                <p class="text-muted" id="pageDescription">จัดการข้อมูลผู้ใช้ในระบบ</p>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-card" id="statsSection">
+                <div class="row">
+                    <div class="col-md-3 col-6">
+                        <div class="stat-item">
+                            <div class="stat-icon admin">
+                                <i class="bi bi-shield-check"></i>
+                            </div>
+                            <div class="stat-number" id="adminCount">3</div>
+                            <div class="stat-label">ผู้ดูแลระบบ</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="stat-item">
+                            <div class="stat-icon user">
+                                <i class="bi bi-person"></i>
+                            </div>
+                            <div class="stat-number" id="userCount">12</div>
+                            <div class="stat-label">ผู้ใช้ทั่วไป</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="stat-item">
+                            <div class="stat-icon active">
+                                <i class="bi bi-check-circle"></i>
+                            </div>
+                            <div class="stat-number" id="activeCount">13</div>
+                            <div class="stat-label">ใช้งานอยู่</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="stat-item">
+                            <div class="stat-icon inactive">
+                                <i class="bi bi-x-circle"></i>
+                            </div>
+                            <div class="stat-number" id="inactiveCount">2</div>
+                            <div class="stat-label">ไม่ใช้งาน</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="search-bar">
+                <div class="row g-3 align-items-end">
+                    <div class="col-md-6">
+                        <label class="form-label">ค้นหาผู้ใช้</label>
+                        <input type="text" class="form-control" id="searchInput"
+                            placeholder="ค้นหาด้วยชื่อ, อีเมล...">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">สิทธิ์</label>
+                        <select class="form-select" id="roleFilter">
+                            <option value="">ทั้งหมด</option>
+                            <option value="admin">ผู้ดูแลระบบ</option>
+                            <option value="user">ผู้ใช้ทั่วไป</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">สถานะ</label>
+                        <select class="form-select" id="statusFilter">
+                            <option value="">ทั้งหมด</option>
+                            <option value="active">ใช้งานอยู่</option>
+                            <option value="inactive">ไม่ใช้งาน</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-3" id="adminActions" style="display: none;">
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                        <i class="bi bi-plus-circle me-2"></i>
+                        เพิ่มผู้ใช้ใหม่
+                    </button>
+                </div>
+            </div>
+
+            <!-- User List -->
+            <div class="user-table-container">
+                <div style="overflow-x: auto;">
+                    <table class="table user-table" style="min-width: 1200px;">
+                        <thead>
+                            <tr>
+                                <!-- <th style="width: 80px;">Avatar</th> -->
+                                <th style="width: 200px;">ชื่อ-นามสกุล</th>
+                                <th style="width: 220px;">อีเมล</th>
+                                <th style="width: 130px;">เบอร์โทร</th>
+                                <th style="width: 180px;">แผนก/ตำแหน่ง</th>
+                                <th style="width: 110px;">สิทธิ์</th>
+                                <th style="width: 110px;">สถานะ</th>
+                                <th style="width: 140px;" class="text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userList">
+                            <!-- Users will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination-container">
+                    <div class="pagination-info">
+                        แสดง <strong id="startIndex">1</strong> - <strong id="endIndex">10</strong>
+                        จาก <strong id="totalUsers">0</strong> คน
+                    </div>
+
+                    <nav>
+                        <ul class="pagination mb-0" id="paginationControls">
+                            <!-- Pagination will be loaded here -->
+                        </ul>
+                    </nav>
+
+                    <div class="items-per-page">
+                        <label class="mb-0">แสดง:</label>
+                        <select class="form-select form-select-sm" id="itemsPerPage" onchange="changeItemsPerPage()">
+                            <option value="10" selected>10</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                        </select>
+                        <span>รายการ</span>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Edit User Modal -->
+            <div class="modal fade" id="editUserModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="bi bi-pencil-square me-2"></i>
+                                แก้ไขข้อมูลผู้ใช้
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="editUserForm">
+                                <input type="hidden" id="editUserId">
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="editName" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">อีเมล <span class="text-danger">*</span></label>
+                                        <input type="email" class="form-control" id="editEmail" required>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">เบอร์โทรศัพท์</label>
+                                        <input type="tel" class="form-control" id="editPhone">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">แผนก/ตำแหน่ง</label>
+                                        <input type="text" class="form-control" id="editDepartment">
+                                    </div>
+                                </div>
+
+                                <div class="row" id="adminEditFields" style="display: none;">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">สิทธิ์การใช้งาน</label>
+                                        <select class="form-select" id="editRole">
+                                            <option value="user">ผู้ใช้ทั่วไป</option>
+                                            <option value="admin">ผู้ดูแลระบบ</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">สถานะ</label>
+                                        <select class="form-select" id="editStatus">
+                                            <option value="active">ใช้งานอยู่</option>
+                                            <option value="inactive">ไม่ใช้งาน</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">รหัสผ่านใหม่ (เว้นว่างหากไม่ต้องการเปลี่ยน)</label>
+                                    <input type="password" class="form-control" id="editPassword"
+                                        placeholder="••••••••">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">ยืนยันรหัสผ่านใหม่</label>
+                                    <input type="password" class="form-control" id="editPasswordConfirm"
+                                        placeholder="••••••••">
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="bi bi-x-circle me-1"></i>ยกเลิก
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="saveUser()">
+                                <i class="bi bi-check-circle me-1"></i>บันทึก
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    </main>
+
+    <!-- Add User Modal (Admin Only) -->
+    <div class="modal fade" id="addUserModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-person-plus me-2"></i>
+                        เพิ่มผู้ใช้ใหม่
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addUserForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="addName" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">อีเมล <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="addEmail" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">เบอร์โทรศัพท์</label>
+                                <input type="tel" class="form-control" id="addPhone">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">แผนก/ตำแหน่ง</label>
+                                <input type="text" class="form-control" id="addDepartment">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">สิทธิ์การใช้งาน</label>
+                                <select class="form-select" id="addRole">
+                                    <option value="user">ผู้ใช้ทั่วไป</option>
+                                    <option value="admin">ผู้ดูแลระบบ</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">สถานะ</label>
+                                <select class="form-select" id="addStatus">
+                                    <option value="active">ใช้งานอยู่</option>
+                                    <option value="inactive">ไม่ใช้งาน</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">รหัสผ่าน <span class="text-danger">*</span></label>
+                                <input type="password" class="form-control" id="addPassword" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">ยืนยันรหัสผ่าน <span class="text-danger">*</span></label>
+                                <input type="password" class="form-control" id="addPasswordConfirm" required>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle me-1"></i>ยกเลิก
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="addUser()">
+                        <i class="bi bi-check-circle me-1"></i>เพิ่มผู้ใช้
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Sidebar Toggle
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.toggle('show');
+            overlay.classList.toggle('show');
+        }
+
+        // Notifications
+        function showNotifications() {
+            alert('แจ้งเตือนทั้งหมด:\n\n- งานใหม่ถูกมอบหมายให้คุณ\n- มีความคิดเห็นใหม่ในงาน\n- งานใกล้ครบกำหนด 3 งาน');
+        }
+
+        // User Menu
+        function toggleUserMenu() {
+            alert('เมนูผู้ใช้:\n- โปรไฟล์\n- ตั้งค่า\n- ออกจากระบบ');
+        }
+
+        // Logout
+        function logout() {
+            if (confirm('คุณต้องการออกจากระบบหรือไม่?')) {
+                window.location.href = 'logout.php';
+            }
+        }
+
+        // Close sidebar when clicking on menu item (mobile)
+        document.querySelectorAll('.menu-link').forEach(link => {
+            link.addEventListener('click', function() {
+                if (window.innerWidth <= 992) {
+                    toggleSidebar();
+                }
+            });
+        });
+    </script>
+    <script>
+        // Mock current user (เปลี่ยนได้ตามระบบจริง)
+        const currentUser = {
+            id: 2,
+            role: 'admin' // 'admin' หรือ 'user'
+        };
+
+        // Mock users data (เพิ่มข้อมูลให้เยอะขึ้น)
+        let users = [{
+                id: 1,
+                name: 'สมชาย ใจดี',
+                email: 'somchai@example.com',
+                phone: '081-234-5678',
+                department: 'Developer',
+                role: 'executive',
+                status: 'active',
+                lastLogin: '2024-12-24 10:30:00',
+                createdAt: '2024-01-15'
+            },
+            {
+                id: 2,
+                name: 'สมหญิง สวยงามมากเป็นพิเศษ',
+                email: 'somying.swayngam.super.long.email@example.com',
+                phone: '082-345-6789',
+                department: 'UI/UX Designer & Frontend Developer',
+                role: 'user',
+                status: 'active',
+                lastLogin: '2024-12-23 15:20:00',
+                createdAt: '2024-02-20'
+            },
+            {
+                id: 3,
+                name: 'วิชัย รักงาน',
+                email: 'wichai@example.com',
+                phone: '083-456-7890',
+                department: 'Project Manager',
+                role: 'admin',
+                status: 'active',
+                lastLogin: '2024-12-24 09:15:00',
+                createdAt: '2024-01-10'
+            },
+            {
+                id: 4,
+                name: 'มานี มีเงิน',
+                email: 'manee@example.com',
+                phone: '084-567-8901',
+                department: 'Marketing',
+                role: 'user',
+                status: 'active',
+                lastLogin: '2024-12-22 14:45:00',
+                createdAt: '2024-03-05'
+            },
+            {
+                id: 5,
+                name: 'ประเสริฐ ดีเด่น',
+                email: 'prasert@example.com',
+                phone: '085-678-9012',
+                department: 'Developer',
+                role: 'user',
+                status: 'inactive',
+                lastLogin: '2024-11-15 10:00:00',
+                createdAt: '2024-02-28'
+            },
+            {
+                id: 6,
+                name: 'จิตรา แสงจันทร์',
+                email: 'jitra@example.com',
+                phone: '086-789-0123',
+                department: 'HR Manager',
+                role: 'user',
+                status: 'active',
+                lastLogin: '2024-12-24 08:30:00',
+                createdAt: '2024-03-15'
+            },
+            {
+                id: 7,
+                name: 'ธนากร เจริญสุข',
+                email: 'thanakorn@example.com',
+                phone: '087-890-1234',
+                department: 'Sales',
+                role: 'user',
+                status: 'active',
+                lastLogin: '2024-12-23 16:00:00',
+                createdAt: '2024-04-01'
+            },
+            {
+                id: 8,
+                name: 'นภัสวรรณ์ ศรีสุขใจดีมากที่สุดในโลก',
+                email: 'napasawan.very.long.name.test@example.co.th',
+                phone: '088-901-2345',
+                department: 'Senior Backend Developer & System Architect',
+                role: 'admin',
+                status: 'active',
+                lastLogin: '2024-12-24 11:00:00',
+                createdAt: '2024-01-20'
+            },
+            {
+                id: 9,
+                name: 'อภิชาติ วรรณกุล',
+                email: 'apichat@example.com',
+                phone: '089-012-3456',
+                department: 'QA Tester',
+                role: 'user',
+                status: 'inactive',
+                lastLogin: '2024-10-20 09:00:00',
+                createdAt: '2024-05-10'
+            },
+            {
+                id: 10,
+                name: 'ศิริพร สมบูรณ์',
+                email: 'siriporn@example.com',
+                phone: '090-123-4567',
+                department: 'Content Writer',
+                role: 'user',
+                status: 'active',
+                lastLogin: '2024-12-23 13:30:00',
+                createdAt: '2024-06-01'
+            },
+            {
+                id: 11,
+                name: 'ชัยวัฒน์ มั่งคั่ง',
+                email: 'chaiwat@example.com',
+                phone: '091-234-5678',
+                department: 'Financial Analyst',
+                role: 'user',
+                status: 'active',
+                lastLogin: '2024-12-24 07:45:00',
+                createdAt: '2024-07-15'
+            },
+            {
+                id: 12,
+                name: 'พิมพ์ใจ รักษ์สุข',
+                email: 'pimjai@example.com',
+                phone: '092-345-6789',
+                department: 'Graphic Designer',
+                role: 'user',
+                status: 'active',
+                lastLogin: '2024-12-22 10:20:00',
+                createdAt: '2024-08-01'
+            },
+            {
+                id: 13,
+                name: 'ธีรพงษ์ ยิ้มแย้ม',
+                email: 'teerapong@example.com',
+                phone: '093-456-7890',
+                department: 'System Administrator',
+                role: 'admin',
+                status: 'active',
+                lastLogin: '2024-12-24 06:00:00',
+                createdAt: '2024-02-01'
+            },
+            {
+                id: 14,
+                name: 'สุดารัตน์ เพชรกลาง',
+                email: 'sudarat@example.com',
+                phone: '094-567-8901',
+                department: 'Legal Advisor',
+                role: 'user',
+                status: 'active',
+                lastLogin: '2024-12-23 12:00:00',
+                createdAt: '2024-09-01'
+            },
+            {
+                id: 15,
+                name: 'วัชรพล แข็งแรง',
+                email: 'watcharapon@example.com',
+                phone: '095-678-9012',
+                department: 'DevOps Engineer',
+                role: 'user',
+                status: 'active',
+                lastLogin: '2024-12-24 05:30:00',
+                createdAt: '2024-10-01'
+            }
+        ];
+
+        let currentPage = 1;
+        let itemsPerPage = 10;
+        let filteredUsers = [];
+
+        function initializePage() {
+            if (currentUser.role === 'admin') {
+                // Admin เห็นทุกคน
+                document.getElementById('pageDescription').textContent = 'จัดการข้อมูลผู้ใช้ทั้งหมดในระบบ';
+                document.getElementById('adminActions').style.display = 'block';
+                document.getElementById('statsSection').style.display = 'block';
+            } else {
+                // User เห็นแค่ตัวเอง
+                document.getElementById('pageDescription').textContent = 'จัดการข้อมูลส่วนตัวของคุณ';
+                document.getElementById('adminActions').style.display = 'none';
+                document.getElementById('statsSection').style.display = 'none';
+                users = users.filter(u => u.id === currentUser.id);
+            }
+
+            updateStats();
+            renderUsers();
+        }
+
+        function updateStats() {
+            if (currentUser.role !== 'admin') return;
+
+            const allUsers = users;
+            document.getElementById('adminCount').textContent = allUsers.filter(u => u.role === 'admin').length;
+            document.getElementById('userCount').textContent = allUsers.filter(u => u.role === 'user').length;
+            document.getElementById('activeCount').textContent = allUsers.filter(u => u.status === 'active').length;
+            document.getElementById('inactiveCount').textContent = allUsers.filter(u => u.status === 'inactive').length;
+        }
+
+        function renderUsers() {
+            const tbody = document.getElementById('userList');
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const roleFilter = document.getElementById('roleFilter').value;
+            const statusFilter = document.getElementById('statusFilter').value;
+
+            filteredUsers = users.filter(user => {
+                const matchSearch = user.name.toLowerCase().includes(searchTerm) ||
+                    user.email.toLowerCase().includes(searchTerm);
+                const matchRole = !roleFilter || user.role === roleFilter;
+                const matchStatus = !statusFilter || user.status === statusFilter;
+
+                return matchSearch && matchRole && matchStatus;
+            });
+
+            // Pagination
+            const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = Math.min(startIndex + itemsPerPage, filteredUsers.length);
+            const usersToShow = filteredUsers.slice(startIndex, endIndex);
+
+            if (usersToShow.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="empty-state">
+                            <i class="bi bi-person-x"></i>
+                            <p class="mt-3">ไม่พบผู้ใช้</p>
+                        </td>
+                    </tr>
+                `;
+                document.querySelector('.pagination-container').style.display = 'none';
+                return;
+            }
+
+            document.querySelector('.pagination-container').style.display = 'flex';
+
+            // <td><div class="table-avatar" title="${user.name}">${user.name.charAt(0)}</div></td>
+            tbody.innerHTML = usersToShow.map(user => `
+                <tr class="${user.id === currentUser.id ? 'current-user' : ''}">
+                    <td>
+                        <div class="user-name-cell" title="${user.name}">
+                            ${user.name}
+                            ${user.id === currentUser.id ? '<span class="you-badge">คุณ</span>' : ''}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="user-email-cell" title="${user.email}">${user.email}</div>
+                    </td>
+                    <td class="phone-cell">
+                        <span class="text-muted" title="${user.phone || '-'}">${user.phone || '-'}</span>
+                    </td>
+                    <td class="department-cell">
+                        <span class="text-muted" title="${user.department || '-'}">${user.department || '-'}</span>
+                    </td>
+                    <td>
+                        <span class="badge-role ${user.role}">
+                            <i class="bi bi-${
+                                user.role === 'admin'
+                                    ? 'shield-check'
+                                    : user.role === 'executive'
+                                    ? 'briefcase-fill'
+                                    : 'person'
+                            }"></i>
+                            ${
+                                user.role === 'admin'
+                                    ? 'Admin'
+                                    : user.role === 'executive'
+                                    ? 'Executive'
+                                    : 'User'
+                            }
+                        </span>
+                    </td>
+
+                    <td>
+                        <span class="badge-status ${user.status}">
+                            <i class="bi bi-circle-fill"></i>
+                            ${user.status === 'active' ? 'ใช้งาน' : 'ไม่ใช้งาน'}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="action-btn-group">
+                            ${canEdit(user.id) ? `
+                                <button class="btn btn-sm btn-primary btn-action-sm" onclick="editUser(${user.id})" title="แก้ไข">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            ` : ''}
+                            ${canDelete(user.id) ? `
+                                <button class="btn btn-sm btn-outline-danger btn-action-sm" onclick="deleteUser(${user.id})" title="ลบ">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            ` : ''}
+                            ${canResetPassword(user.id) && currentUser.role === 'admin' ? `
+                                <button class="btn btn-sm btn-outline-warning btn-action-sm" onclick="resetPassword(${user.id})" title="รีเซ็ตรหัสผ่าน">
+                                    <i class="bi bi-key"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+
+            updatePaginationInfo();
+            renderPagination();
+        }
+
+        function updatePaginationInfo() {
+            const startIndex = (currentPage - 1) * itemsPerPage + 1;
+            const endIndex = Math.min(startIndex + itemsPerPage - 1, filteredUsers.length);
+
+            document.getElementById('startIndex').textContent = filteredUsers.length > 0 ? startIndex : 0;
+            document.getElementById('endIndex').textContent = endIndex;
+            document.getElementById('totalUsers').textContent = filteredUsers.length;
+        }
+
+        function renderPagination() {
+            const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+            const paginationControls = document.getElementById('paginationControls');
+
+            let html = '';
+
+            // Previous button
+            html += `
+                <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                </li>
+            `;
+
+            // Page numbers
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+
+            if (startPage > 1) {
+                html += `
+                    <li class="page-item">
+                        <a class="page-link" href="#" onclick="goToPage(1); return false;">1</a>
+                    </li>
+                `;
+                if (startPage > 2) {
+                    html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                html += `
+                    <li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>
+                    </li>
+                `;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                }
+                html += `
+                    <li class="page-item">
+                        <a class="page-link" href="#" onclick="goToPage(${totalPages}); return false;">${totalPages}</a>
+                    </li>
+                `;
+            }
+
+            // Next button
+            html += `
+                <li class="page-item ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+            `;
+
+            paginationControls.innerHTML = html;
+        }
+
+        function goToPage(page) {
+            const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
+            renderUsers();
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+
+        function changeItemsPerPage() {
+            itemsPerPage = parseInt(document.getElementById('itemsPerPage').value);
+            currentPage = 1;
+            renderUsers();
+        }
+
+        function canEdit(userId) {
+            // Admin แก้ไขได้ทุกคน, User แก้ไขได้แค่ตัวเอง
+            return currentUser.role === 'admin' || userId === currentUser.id;
+        }
+
+        function canDelete(userId) {
+            // Admin ลบได้ แต่ลบตัวเองไม่ได้
+            return currentUser.role === 'admin' && userId !== currentUser.id;
+        }
+
+        function canResetPassword(userId) {
+            // Admin รีเซ็ตได้ทุกคน
+            return currentUser.role === 'admin';
+        }
+
+        function editUser(userId) {
+            const user = users.find(u => u.id === userId);
+            if (!user) return;
+
+            document.getElementById('editUserId').value = user.id;
+            document.getElementById('editName').value = user.name;
+            document.getElementById('editEmail').value = user.email;
+            document.getElementById('editPhone').value = user.phone || '';
+            document.getElementById('editDepartment').value = user.department || '';
+            document.getElementById('editRole').value = user.role;
+            document.getElementById('editStatus').value = user.status;
+            document.getElementById('editPassword').value = '';
+            document.getElementById('editPasswordConfirm').value = '';
+
+            // Admin เห็นฟิลด์เพิ่มเติม
+            if (currentUser.role === 'admin') {
+                document.getElementById('adminEditFields').style.display = 'flex';
+            } else {
+                document.getElementById('adminEditFields').style.display = 'none';
+            }
+
+            const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
+            modal.show();
+        }
+
+        function saveUser() {
+            const userId = parseInt(document.getElementById('editUserId').value);
+            const user = users.find(u => u.id === userId);
+            if (!user) return;
+
+            const password = document.getElementById('editPassword').value;
+            const passwordConfirm = document.getElementById('editPasswordConfirm').value;
+
+            if (password && password !== passwordConfirm) {
+                alert('รหัสผ่านไม่ตรงกัน');
+                return;
+            }
+
+            user.name = document.getElementById('editName').value;
+            user.email = document.getElementById('editEmail').value;
+            user.phone = document.getElementById('editPhone').value;
+            user.department = document.getElementById('editDepartment').value;
+
+            if (currentUser.role === 'admin') {
+                user.role = document.getElementById('editRole').value;
+                user.status = document.getElementById('editStatus').value;
+            }
+
+            // ในการใช้งานจริง ส่งข้อมูลไป API
+            console.log('Saving user:', user);
+
+            bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
+            updateStats();
+            renderUsers();
+            alert('บันทึกข้อมูลสำเร็จ');
+        }
+
+        function addUser() {
+            const password = document.getElementById('addPassword').value;
+            const passwordConfirm = document.getElementById('addPasswordConfirm').value;
+
+            if (password !== passwordConfirm) {
+                alert('รหัสผ่านไม่ตรงกัน');
+                return;
+            }
+
+            const newUser = {
+                id: users.length + 1,
+                name: document.getElementById('addName').value,
+                email: document.getElementById('addEmail').value,
+                phone: document.getElementById('addPhone').value,
+                department: document.getElementById('addDepartment').value,
+                role: document.getElementById('addRole').value,
+                status: document.getElementById('addStatus').value,
+                lastLogin: new Date().toISOString(),
+                createdAt: new Date().toISOString().split('T')[0]
+            };
+
+            users.push(newUser);
+
+            // ในการใช้งานจริง ส่งข้อมูลไป API
+            console.log('Adding user:', newUser);
+
+            bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+            document.getElementById('addUserForm').reset();
+            updateStats();
+            renderUsers();
+            alert('เพิ่มผู้ใช้สำเร็จ');
+        }
+
+        function deleteUser(userId) {
+            const user = users.find(u => u.id === userId);
+            if (!user) return;
+
+            if (confirm(`คุณต้องการลบผู้ใช้ "${user.name}" หรือไม่?`)) {
+                users = users.filter(u => u.id !== userId);
+
+                // ในการใช้งานจริง ส่งข้อมูลไป API
+                console.log('Deleting user:', userId);
+
+                updateStats();
+                renderUsers();
+                alert('ลบผู้ใช้สำเร็จ');
+            }
+        }
+
+        function resetPassword(userId) {
+            const user = users.find(u => u.id === userId);
+            if (!user) return;
+
+            if (confirm(`รีเซ็ตรหัสผ่านของ "${user.name}" หรือไม่?\n\nรหัสผ่านใหม่จะถูกส่งไปยังอีเมล ${user.email}`)) {
+                // ในการใช้งานจริง ส่งข้อมูลไป API
+                console.log('Resetting password for user:', userId);
+                alert('รีเซ็ตรหัสผ่านสำเร็จ\nรหัสผ่านใหม่ถูกส่งไปยังอีเมลแล้ว');
+            }
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const options = {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            };
+            return date.toLocaleDateString('th-TH', options);
+        }
+
+        // Search and Filter
+        document.getElementById('searchInput').addEventListener('input', function() {
+            currentPage = 1;
+            renderUsers();
+        });
+        document.getElementById('roleFilter').addEventListener('change', function() {
+            currentPage = 1;
+            renderUsers();
+        });
+        document.getElementById('statusFilter').addEventListener('change', function() {
+            currentPage = 1;
+            renderUsers();
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', initializePage);
+    </script>
+</body>
+
+</html>
