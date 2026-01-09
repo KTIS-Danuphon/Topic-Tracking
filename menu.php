@@ -66,7 +66,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 
     </ul>
 
-    <div class="sidebar-header" style="margin-top: 1rem;">
+    <div class="sidebar-header" style="margin-top: 0.5rem;">
         <div class="sidebar-title">จัดการระบบ</div>
     </div>
 

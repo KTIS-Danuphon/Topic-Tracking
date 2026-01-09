@@ -199,10 +199,12 @@ foreach ($result_topic as $row) {
             z-index: 999;
             overflow-y: auto;
             transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
         }
 
         .sidebar-header {
-            padding: 2rem 1.5rem 1rem;
+            padding: 1rem 1.5rem 1px;
             border-bottom: 1px solid #e2e8f0;
         }
 
@@ -217,7 +219,7 @@ foreach ($result_topic as $row) {
 
         .sidebar-menu {
             list-style: none;
-            padding: 1rem 0;
+            padding: 1rem 0 0.25rem 0;
         }
 
         .menu-item {
@@ -275,13 +277,15 @@ foreach ($result_topic as $row) {
         }
 
         .sidebar-footer {
-            position: absolute;
+            position: sticky;
             bottom: 0;
             left: 0;
             right: 0;
             padding: 1.5rem;
+            margin-top: auto;
             border-top: 1px solid #e2e8f0;
             background: white;
+            z-index: 10;
         }
 
         .logout-btn {
@@ -379,7 +383,19 @@ foreach ($result_topic as $row) {
         }
 
         .task-title-cell {
-            max-width: 300px;
+            /* padding: 1rem; */
+            max-width: 250px;
+        }
+
+        .task-title-wrapper {
+            margin-bottom: 0.5rem;
+        }
+
+        .task-meta {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
         }
 
         .task-title-text {
@@ -400,12 +416,13 @@ foreach ($result_topic as $row) {
         }
 
         .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
             padding: 0.35rem 0.75rem;
             border-radius: 20px;
             font-size: 0.8rem;
-            font-weight: 600;
-            display: inline-block;
-            white-space: nowrap;
+            font-weight: 500;
         }
 
         .status-badge.pending {
@@ -421,6 +438,59 @@ foreach ($result_topic as $row) {
         .status-badge.completed {
             background-color: #d1fae5;
             color: #065f46;
+        }
+
+        .status-badge.overdue {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-badge.overdue-critical {
+            background-color: #fecaca;
+            color: #7f1d1d;
+            font-weight: 600;
+            animation: pulse-subtle 2s infinite;
+        }
+
+        @keyframes pulse-subtle {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.9;
+                transform: scale(1.02);
+            }
+        }
+
+        /* .task-description-preview {
+            font-size: 0.85rem;
+            color: #64748b;
+            line-height: 1.5;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        } */
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            /* .task-title-text {
+                font-size: 0.9rem;
+            } */
+
+            /* .status-badge {
+                font-size: 0.75rem;
+                padding: 0.25rem 0.6rem;
+            }
+
+            .task-description-preview {
+                font-size: 0.8rem;
+            } */
         }
 
         .category-badge {
@@ -517,7 +587,15 @@ foreach ($result_topic as $row) {
             }
 
             .top-navbar {
-                padding: 0 1rem;
+                padding: 0 0.5rem;
+            }
+
+            .navbar-right {
+                gap: 0.5rem;
+            }
+
+            .user-profile {
+                padding: 0.5rem;
             }
         }
 
@@ -608,13 +686,19 @@ foreach ($result_topic as $row) {
                 <table class="table task-table">
                     <thead>
                         <tr>
-                            <th style="width: 10%;">รหัสงาน</th>
+                            <th style="width: 8%;">รหัสงาน</th>
+                            <th style="width: 32%;">ชื่องาน</th>
+                            <th style="width: 14%;">หมวดหมู่</th>
+                            <th style="width: 16%;">สถานะ</th>
+                            <th style="width: 10%;">ความเร่งด่วน</th>
+                            <th style="width: 20%;">วันที่สร้าง</th>
+                            <!-- <th style="width: 10%;">รหัสงาน</th>
                             <th style="width: 30%;">ชื่องาน</th>
                             <th style="width: 12%;">หมวดหมู่</th>
                             <th style="width: 13%;">สถานะ</th>
                             <th style="width: 12%;">ความเร่งด่วน</th>
                             <th style="width: 13%;">วันที่สร้าง</th>
-                            <th style="width: 10%;" class="text-center">จัดการ</th>
+                            <th style="width: 10%;" class="text-center">จัดการ</th> -->
                         </tr>
                     </thead>
                     <tbody id="taskTableBody">
@@ -699,9 +783,9 @@ foreach ($result_topic as $row) {
 
         function getStatusName(status) {
             const statuses = {
-                'pending': 'รอดำเนินการ',
-                'in-progress': 'กำลังดำเนินการ',
-                'completed': 'เสร็จสิ้น'
+                'pending': '<i class="bi bi-clock"></i>รอดำเนินการ',
+                'in-progress': '<i class="bi bi-arrow-repeat"></i>กำลังดำเนินการ',
+                'completed': '<i class="bi bi-check-circle-fill"></i>เสร็จสิ้น'
             };
             return statuses[status] || 'ไม่ทราบสถานะ';
         }
@@ -748,12 +832,42 @@ foreach ($result_topic as $row) {
                 `;
                 return;
             }
+            //ตัวอย่างสถานะงาน
+            // <!-- รอดำเนินการ -->
+            // <span class="status-badge pending">
+            //     <i class="bi bi-clock"></i>
+            //     รอดำเนินการ
+            // </span>
 
+            // <!-- กำลังดำเนินการ -->
+            // <span class="status-badge in-progress">
+            //     <i class="bi bi-arrow-repeat"></i>
+            //     กำลังดำเนินการ
+            // </span>
+
+            // <!-- เสร็จสิ้น -->
+            // <span class="status-badge completed">
+            //     <i class="bi bi-check-circle-fill"></i>
+            //     เสร็จสิ้น
+            // </span>
+
+            // <!-- เลยกำหนด -->
+            // <span class="status-badge overdue">
+            //     <i class="bi bi-exclamation-circle-fill"></i>
+            //     เลยกำหนด 2 วัน
+            // </span>
+
+            // <!-- เลยกำหนดมาก -->
+            // <span class="status-badge overdue-critical">
+            //     <i class="bi bi-exclamation-triangle-fill"></i>
+            //     เลยกำหนด 5 วัน
+            // </span>
+            const showAction = false;
             tbody.innerHTML = tasksToShow.map(task => `
                 <tr onclick="viewTask('${task.encrypt_id}')">
                     <td>
                         <div class="task-id">
-                            <i class="bi bi-hash"></i>${task.id.toString().padStart(4, '0')}
+                            <i class="bi bi-hash"></i>Task-${task.id.toString().padStart(4, '0')}
                         </div>
                     </td>
                     <td class="task-title-cell">
@@ -770,6 +884,7 @@ foreach ($result_topic as $row) {
                             ${getStatusName(task.status)}
                         </span>
                     </td>
+                    
                     <td>
                         <div class="priority-stars" title="${task.importance} ดาว">
                             ${generateStars(task.importance)}
@@ -780,13 +895,16 @@ foreach ($result_topic as $row) {
                             <i class="bi bi-calendar3 me-1"></i>${formatDate(task.created_at)}
                         </div>
                     </td>
+                    ${showAction ? `
                     <td class="text-center">
                         <div class="action-buttons justify-content-center">
-                            <button class="btn btn-sm btn-outline-primary btn-action" onclick="event.stopPropagation(); viewTask('${task.encrypt_id}')" title="ดูรายละเอียด">
+                            <button class="btn btn-sm btn-outline-primary btn-action"
+                                    onclick="event.stopPropagation(); viewTask('${task.encrypt_id}')">
                                 <i class="bi bi-eye"></i>
                             </button>
                         </div>
                     </td>
+                    ` : ''}
                 </tr>
             `).join('');
 
