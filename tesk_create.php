@@ -1575,6 +1575,7 @@ foreach ($result_user as $row) {
 
         function handleFiles(files) {
             for (let file of files) {
+
                 if (file.size > MAX_FILE_SIZE) {
                     alert(`ไฟล์ "${file.name}" มีขนาดใหญ่เกิน 2 MB`);
                     continue;
@@ -1585,13 +1586,24 @@ foreach ($result_user as $row) {
                     break;
                 }
 
+                // กันไฟล์ชื่อซ้ำ
+                if (selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+                    continue;
+                }
+
                 selectedFiles.push(file);
                 totalFileSize += file.size;
                 addFileToList(file);
             }
 
+            syncInputFiles();
             updateTotalSize();
-            fileInput.value = '';
+        }
+
+        function syncInputFiles() {
+            const dataTransfer = new DataTransfer();
+            selectedFiles.forEach(file => dataTransfer.items.add(file));
+            fileInput.files = dataTransfer.files;
         }
 
         function addFileToList(file) {
@@ -1599,39 +1611,34 @@ foreach ($result_user as $row) {
             const fileDiv = document.createElement('div');
             fileDiv.className = 'file-item';
             fileDiv.dataset.fileId = fileId;
-            fileDiv.dataset.fileName = file.name;
-
-            const icon = getFileIcon(file.type);
 
             fileDiv.innerHTML = `
                 <div class="file-icon">
-                    <i class="bi bi-${icon}"></i>
+                    <i class="bi bi-${getFileIcon(file.type)}"></i>
                 </div>
                 <div class="file-details">
                     <div class="file-name" title="${file.name}">${file.name}</div>
                     <div class="file-size">${formatFileSize(file.size)}</div>
                 </div>
-                <button type="button" class="btn-remove-file" onclick="removeFile('${fileId}')">
+                <button type="button" class="btn-remove-file">
                     <i class="bi bi-trash"></i>
                 </button>
             `;
 
+            fileDiv.querySelector('.btn-remove-file').addEventListener('click', () => {
+                removeFile(fileId, file);
+            });
+
             fileList.appendChild(fileDiv);
         }
 
-        function removeFile(fileId) {
-            const fileDiv = document.querySelector(`[data-file-id="${fileId}"]`);
-            if (!fileDiv) return;
+        function removeFile(fileId, file) {
+            selectedFiles = selectedFiles.filter(f => f !== file);
+            totalFileSize -= file.size;
 
-            const fileName = fileDiv.dataset.fileName;
-            const fileIndex = selectedFiles.findIndex(f => f.name === fileName);
+            document.querySelector(`[data-file-id="${fileId}"]`)?.remove();
 
-            if (fileIndex > -1) {
-                totalFileSize -= selectedFiles[fileIndex].size;
-                selectedFiles.splice(fileIndex, 1);
-            }
-
-            fileDiv.remove();
+            syncInputFiles();
             updateTotalSize();
         }
 
@@ -1640,19 +1647,15 @@ foreach ($result_user as $row) {
             const sizeMB = (totalFileSize / (1024 * 1024)).toFixed(2);
             totalSizeElement.textContent = `${sizeMB} MB`;
 
-            if (totalFileSize > MAX_TOTAL_SIZE * 0.8) {
-                totalSizeElement.className = 'size-warning';
-            } else {
-                totalSizeElement.className = 'size-ok';
-            }
+            totalSizeElement.className =
+                totalFileSize > MAX_TOTAL_SIZE * 0.8 ? 'size-warning' : 'size-ok';
         }
 
         function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
             const sizes = ['Bytes', 'KB', 'MB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            if (bytes === 0) return '0 Bytes';
+            const i = Math.floor(Math.log(bytes) / Math.log(1024));
+            return (bytes / Math.pow(1024, i)).toFixed(2) + ' ' + sizes[i];
         }
 
         function getFileIcon(mimeType) {

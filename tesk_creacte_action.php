@@ -5,67 +5,146 @@ date_default_timezone_set('Asia/Bangkok');
 require_once 'class/crud.class.php';
 require_once 'class/util.class.php';
 require_once 'class/encrypt.class.php';
-
+require_once 'class/fileupload.class.php';
 $object   = new CRUD();
 $util     = new Util();
 $Encrypt  = new Encrypt_data();
+$fileUploader = new SecureFileUpload('files_upload/tasks/'); // กำหนดโฟลเดอร์เก็บไฟล์
+
 $now = new DateTime();
+
 $formatted_now = $now->format('Y-m-d H:i:s');
 
-// รับข้อมูลจาก POST (ถ้ามี)
-$formData = isset($_POST) ? $_POST : [];
 
-// ถ้าไม่มีข้อมูลให้กลับไปหน้าแรก
-if (empty($formData)) {
-    header('Location: tesk_create.php');
-    exit();
-}
+try {
+    // ตรวจสอบ POST data
+    $formData = isset($_POST) ? $_POST : [];
 
-$taskTitle = $util->testInput($formData['taskTitle']); // หัวข้อเรื่อง
-$taskCategory = $util->testInput($formData['taskCategory']); // หมวดหมู่
-$taskDescription = $util->testInput($formData['taskDescription']); // รายละเอียด
-$taskStatus = $util->testInput($formData['taskStatus']); // สถานะ
-$taskDueDate = $util->testInput($formData['taskDueDate']); // กำหนดวันครบกำหนด
-$taskImportance = $util->testInput($formData['taskImportance']); // ความสำคัญ ดาว
-$mentionedUsers = $formData['mentionedUsers']; // ผู้ที่ถูกกล่าวถึง
-$additionalUsers = $formData['additionalUsers']; // ผู้เข้าร่วมเพิ่มเติม
-$createdBy = $_SESSION['user_id']; // ผู้สร้างงาน (จาก session)
-
-// $password  = $Encrypt->EnCrypt_pass($util->testInput($_POST['password']));
-$table = 'tb_topics_c050968';
-$fields = 'fd_topic_id, fd_topic_title, fd_topic_category, fd_topic_created_at';
-$where = 'WHERE fd_topic_title = "' . $taskTitle . '" AND fd_topic_category = "' . $taskCategory . '" AND fd_topic_created_at = "' . $formatted_now . '"';
-$result_task = $object->ReadData($table, $fields, $where);
-$iconType = 'warning';
-if (!empty($result_task)) {
-    // พบข้อมูลซ้ำ
-    $taskID = $result_task[0]['fd_topic_id'];
-    $iconType = 'warning';
-    $errorMessage = 'พบข้อมูลซ้ำในระบบ';
-} else {
-    // บันทึกข้อมูลใหม่
-    $fields_data = [
-        'fd_topic_title' => $taskTitle,
-        'fd_topic_category' => $taskCategory,
-        'fd_topic_detail' => $taskDescription,
-        'fd_topic_mentioned' => $mentionedUsers,
-        'fd_topic_status' => $taskStatus,
-        'fd_topic_participant' => $additionalUsers,
-        'fd_topic_created_by' => $createdBy,
-        'fd_topic_importance' => $taskImportance,
-        'fd_topic_private' => '1',
-        'fd_topic_active' => '1',
-        'fd_topic_created_at' => $formatted_now,
-        'fd_topic_updated_at' => $formatted_now,
-    ];
-
-    $taskID = $object->Insert_Data($table, $fields_data);
-
-    if (!$taskID) {
-        throw new Exception('ไม่สามารถบันทึกข้อมูลได้');
+    // ถ้าไม่มีข้อมูลให้กลับไปหน้าแรก
+    if (empty($_POST)) {
+        header('Location: task_create.php');
+        exit();
     }
 
-    $iconType = 'success';
+    // รับข้อมูล Task
+    $taskTitle = trim($_POST['taskTitle'] ?? ''); // ชื่อเรื่องงาน
+    $taskCategory = trim($_POST['taskCategory'] ?? ''); // หมวดหมู่งาน
+    $taskDescription = trim($_POST['taskDescription'] ?? ''); // รายละเอียดงาน
+    $taskStatus = trim($_POST['taskStatus'] ?? 'pending'); // สถานะงาน
+    $taskDueDate = trim($_POST['taskDueDate'] ?? ''); // กำหนดวันครบกำหนด
+    $taskImportance = trim($_POST['taskImportance'] ?? '1'); // ความสำคัญงาน
+    $mentionedUsers = $_POST['mentionedUsers'] ?? ''; // ผู้ที่ถูกกล่าวถึง
+    $additionalUsers = $_POST['additionalUsers'] ?? ''; // ผู้เข้าร่วมงาน
+    $createdBy = $_SESSION['user_id'] ?? null; // ผู้สร้างงาน
+
+    // $password  = $Encrypt->EnCrypt_pass($util->testInput($_POST['password']));
+    $table = 'tb_topics_c050968';
+    $fields = 'fd_topic_id, fd_topic_title, fd_topic_category, fd_topic_created_at';
+    $where = 'WHERE fd_topic_title = "' . $taskTitle . '" AND fd_topic_category = "' . $taskCategory . '" AND fd_topic_created_at = "' . $formatted_now . '"';
+    $result_task = $object->ReadData($table, $fields, $where);
+    $iconType = 'warning';
+    if (!empty($result_task)) {
+        // พบข้อมูลซ้ำ
+        $taskID = $result_task[0]['fd_topic_id'];
+        $iconType = 'warning';
+        $errorMessage = 'พบข้อมูลซ้ำในระบบ';
+    } else {
+
+        try {
+            // 1. บันทึกข้อมูล Task
+            $taskData = [
+                'fd_topic_title' => $taskTitle,
+                'fd_topic_category' => $taskCategory,
+                'fd_topic_detail' => $taskDescription,
+                'fd_topic_mentioned' => $mentionedUsers,
+                'fd_topic_status' => $taskStatus,
+                'fd_topic_participant' => $additionalUsers,
+                'fd_topic_created_by' => $createdBy,
+                'fd_topic_importance' => $taskImportance,
+                'fd_topic_private' => '1',
+                'fd_topic_active' => '1',
+                'fd_topic_created_at' => $formatted_now,
+                'fd_topic_updated_at' => $formatted_now,
+            ];
+
+            $taskID = $object->Insert_Data('tb_topics_c050968', $taskData);
+
+            if (!$taskID) {
+                throw new Exception('ไม่สามารถบันทึกข้อมูล Task ได้');
+            }
+
+            // 2. จัดการ Upload ไฟล์ (ถ้ามี)
+            $uploadErrors = [];
+
+            if (
+                isset($_FILES['files']) &&
+                !empty($_FILES['files']['name'][0])
+            ) {
+                try {
+
+                    $uploadedFiles = $fileUploader->uploadMultiple($_FILES['files'], $taskID);
+
+                    if (!empty($uploadedFiles)) {
+
+                        foreach ($uploadedFiles as $fileInfo) {
+
+                            $fileData = [
+                                'fd_file_task_id'        => $taskID,
+                                'fd_file_original_name'  => $fileInfo['original_name'],
+                                'fd_file_saved_name'     => $fileInfo['saved_name'],
+                                'fd_file_path'           => $fileInfo['file_path'],
+                                'fd_file_size'           => $fileInfo['file_size'],
+                                'fd_file_type'           => $fileInfo['file_type'],
+                                'fd_file_extension'      => $fileInfo['extension'],
+                                'fd_file_uploaded_by'    => $createdBy,
+                                'fd_file_uploaded_at'    => $formatted_now,
+                                'fd_file_active'         => '1'
+                            ];
+
+                            $fileId = $object->Insert_Data('tb_topic_files_c050968', $fileData);
+
+                            if ($fileId) {
+                                $uploadedFilesInfo[] = [
+                                    'id'   => $fileId,
+                                    'name' => $fileInfo['original_name'],
+                                    'size' => $fileInfo['file_size']
+                                ];
+                            }
+                        }
+                    }
+
+                    $uploadErrors = $fileUploader->getErrors();
+                } catch (Exception $e) {
+                    $uploadErrors[] = $e->getMessage();
+                }
+            }
+
+
+            // Commit Transaction
+
+            // ตั้งค่าผลลัพธ์
+            if (!empty($uploadErrors)) {
+                $iconType = 'warning';
+                $errorMessage = 'บันทึก Task สำเร็จ แต่มีไฟล์บางไฟล์อัปโหลดไม่สำเร็จ: ' . implode(', ', $uploadErrors);
+            } else {
+                $iconType = 'success';
+            }
+            if (empty($_FILES['files']['tmp_name'][0])) {
+                $iconType = 'warning';
+                $errorMessage = 'บันทึก Task สำเร็จ แต่มีไฟล์บางไฟล์อัปโหลดไม่สำเร็จ: ' . implode(', ', $uploadErrors);
+            }
+        } catch (Exception $e) {
+            // Rollback ถ้ามีข้อผิดพลาด
+            $iconType = 'error';
+            $errorMessage = $e->getMessage();
+
+            throw $e;
+        }
+    }
+} catch (Exception $e) {
+    $iconType = 'error';
+    $errorMessage = $e->getMessage();
+    error_log("Task Save Error: " . $e->getMessage());
 }
 ?>
 <!DOCTYPE html>
@@ -914,7 +993,7 @@ if (!empty($result_task)) {
 
     <script>
         const iconType = '<?php echo $iconType; ?>';
-
+        const errorMessage = '<?php echo isset($errorMessage) ? addslashes($errorMessage) : ''; ?>';
         // Configuration for each state
         const stateConfig = {
             success: {
@@ -983,7 +1062,7 @@ if (!empty($result_task)) {
 
             // เปลี่ยนข้อความ
             document.getElementById('savingText').textContent = config.title;
-            document.getElementById('savingSubtext').textContent = config.subtitle;
+            document.getElementById('savingSubtext').textContent = errorMessage;
 
             // แสดงรายละเอียด
             // document.getElementById('resultMessage').textContent = config.message;
