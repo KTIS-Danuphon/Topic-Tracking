@@ -61,6 +61,7 @@ try {
                 'fd_topic_participant' => $additionalUsers,
                 'fd_topic_created_by' => $createdBy,
                 'fd_topic_importance' => $taskImportance,
+                'fd_topic_due_date' => $taskDueDate,
                 'fd_topic_private' => '1',
                 'fd_topic_active' => '1',
                 'fd_topic_created_at' => $formatted_now,
