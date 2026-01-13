@@ -1,4 +1,79 @@
-<?php include 'session_check.php'; ?>
+<?php
+include 'session_check.php';
+date_default_timezone_set('Asia/Bangkok');
+
+require_once 'class/crud.class.php';
+require_once 'class/util.class.php';
+require_once 'class/encrypt.class.php';
+
+$object   = new CRUD();
+$util     = new Util();
+$Encrypt  = new Encrypt_data();
+$now = new DateTime();
+$formatted_now = $now->format('Y-m-d H:i:s');
+$TaskID = $Encrypt->DeCrypt_pass($_GET['taskID']);
+if (empty($TaskID)) {
+    header('Location: tasks.php');
+    exit();
+}
+// ดึงข้อมูลงาน
+$table = 'tb_topics_c050968';
+$fields = 'fd_topic_id, fd_topic_title, fd_topic_detail, fd_topic_category, fd_topic_mentioned, fd_topic_status, fd_topic_participant, fd_topic_created_by, fd_topic_importance, fd_topic_private, fd_topic_active, fd_topic_created_at ';
+$where = 'WHERE fd_topic_id = "' . $Encrypt->DeCrypt_pass($_GET['taskID']) . '" ';
+$result_topic = $object->ReadData($table, $fields, $where);
+$result_participant = trim($result_topic[0]['fd_topic_participant'], '[]'); // ลบ [] ออก
+
+$table = 'tb_users_c050968 user';
+$fields = 'user.fd_user_id, user.fd_user_fullname, dept.fd_dept_name ';
+$where = 'LEFT JOIN tb_departments_c050968 dept ON dept.fd_dept_id = user.fd_user_dept ';
+$where .= 'WHERE user.fd_user_id  IN (' . $result_participant . ') AND user.fd_user_active = "1" ';
+$result_user = $object->ReadData($table, $fields, $where);
+foreach ($result_user as &$row) {
+    $fullname = $row['fd_user_fullname'];
+    $nameParts = preg_split('/\s+/', trim($fullname));
+
+    $avatar = '';
+    foreach ($nameParts as $p) {
+        $avatar .= mb_substr($p, 0, 1, 'UTF-8');
+    }
+
+    $row['avatar'] = $avatar;
+}
+unset($row); // สำคัญ ป้องกัน bug
+
+$table = 'tb_topic_files_c050968';
+$fields = 'fd_file_id, fd_file_original_name , fd_file_path, fd_file_size, fd_file_type ';
+$where = 'WHERE fd_file_task_id = "' . $Encrypt->DeCrypt_pass($_GET['taskID']) . '" AND fd_file_active = "1" ';
+$result_files = $object->ReadData($table, $fields, $where);
+
+$table = 'tb_topic_log_c050968';
+$fields = 'fd_topic_log_id, fd_topic_log_type, fd_topic_log_text, fd_topic_log_time ';
+$where = 'WHERE fd_topic_id = "' . $Encrypt->DeCrypt_pass($_GET['taskID']) . '" ORDER BY fd_topic_log_id DESC';
+$result_log = $object->ReadData($table, $fields, $where);
+
+
+$task = $result_topic[0];
+$taskData = [
+    'id' => (int)$task['fd_topic_id'],
+    'title' => $task['fd_topic_title'],
+    'description' => $task['fd_topic_detail'],
+    'category' => $task['fd_topic_category'],
+    'status' => $task['fd_topic_status'],
+    'importance' => (int)$task['fd_topic_importance'],
+    'due_date' => $task['fd_topic_due_date'] ?? null, // ถ้ายังไม่มี field update
+    'created_at' => $task['fd_topic_created_at'],
+];
+
+$taskData['team'] = $result_user; // ดึงผู้เกี่ยวข้องจากฐานข้อมูลถ้ามี
+$taskData['files'] = $result_files; // ดึงไฟล์จากฐานข้อมูลถ้ามี
+$taskData['allComments'] = []; // ดึงความคิดเห็นจากฐานข้อมูลถ้ามี
+
+$taskData['allActivity'] = $result_log; // ดึงกิจกรรมจากฐานข้อมูลถ้ามี
+
+
+// ดึงกิจกรรมจากฐานข้อมูลถ้ามี
+
+?>
 <!DOCTYPE html>
 <html lang="th">
 
@@ -6,339 +81,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>รายละเอียดงาน - Topic Tracking</title>
+    <link rel="icon" href="ktis.svg" type="image/svg+xml">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --sidebar-width: 260px;
-            --navbar-height: 70px;
-            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --primary-color: #667eea;
-            --secondary-color: #764ba2;
-        }
+    <?php include 'style_menu.php'; ?>
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f7fa;
-            overflow-x: hidden;
-        }
-
-        /* Top Navbar */
-        .top-navbar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: var(--navbar-height);
-            background: white;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            padding: 0 2rem;
-        }
-
-        .navbar-brand {
-            font-size: 1.5rem;
-            font-weight: 700;
-            background: var(--primary-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .navbar-brand i {
-            font-size: 1.8rem;
-            -webkit-text-fill-color: var(--primary-color);
-        }
-
-        .navbar-right {
-            margin-left: auto;
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-        }
-
-        .notification-btn {
-            position: relative;
-            background: transparent;
-            border: none;
-            font-size: 1.3rem;
-            color: #64748b;
-            cursor: pointer;
-            padding: 0.5rem;
-            border-radius: 8px;
-            transition: all 0.3s;
-        }
-
-        .notification-btn:hover {
-            background: #f1f5f9;
-            color: var(--primary-color);
-        }
-
-        .notification-badge {
-            position: absolute;
-            top: 0;
-            right: 0;
-            background: #ef4444;
-            color: white;
-            font-size: 0.65rem;
-            padding: 0.15rem 0.4rem;
-            border-radius: 10px;
-            font-weight: 600;
-        }
-
-        .user-profile {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            cursor: pointer;
-            padding: 0.5rem 1rem;
-            border-radius: 10px;
-            transition: all 0.3s;
-        }
-
-        .user-profile:hover {
-            background: #f1f5f9;
-        }
-
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--primary-gradient);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-        }
-
-        .user-info {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .user-name {
-            font-weight: 600;
-            font-size: 0.9rem;
-            color: #1e293b;
-        }
-
-        .user-role {
-            font-size: 0.75rem;
-            color: #64748b;
-        }
-
-        /* Sidebar */
-        .sidebar {
-            position: fixed;
-            left: 0;
-            top: var(--navbar-height);
-            bottom: 0;
-            width: var(--sidebar-width);
-            background: white;
-            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.05);
-            z-index: 999;
-            overflow-y: auto;
-            transition: all 0.3s ease;
-        }
-
-        .sidebar-header {
-            padding: 2rem 1.5rem 1rem;
-            border-bottom: 1px solid #e2e8f0;
-        }
-
-        .sidebar-title {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #94a3b8;
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }
-
-        .sidebar-menu {
-            list-style: none;
-            padding: 1rem 0;
-        }
-
-        .menu-item {
-            margin-bottom: 0.25rem;
-        }
-
-        .menu-link {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 0.875rem 1.5rem;
-            color: #64748b;
-            text-decoration: none;
-            transition: all 0.3s;
-            position: relative;
-            font-weight: 500;
-        }
-
-        .menu-link:hover {
-            background: linear-gradient(90deg, rgba(102, 126, 234, 0.1) 0%, transparent 100%);
-            color: var(--primary-color);
-        }
-
-        .menu-link.active {
-            background: linear-gradient(90deg, rgba(102, 126, 234, 0.15) 0%, transparent 100%);
-            color: var(--primary-color);
-            font-weight: 600;
-        }
-
-        .menu-link.active::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            bottom: 0;
-            width: 4px;
-            background: var(--primary-gradient);
-            border-radius: 0 4px 4px 0;
-        }
-
-        .menu-link i {
-            font-size: 1.2rem;
-            width: 24px;
-            text-align: center;
-        }
-
-        .menu-badge {
-            margin-left: auto;
-            background: #fee2e2;
-            color: #dc2626;
-            font-size: 0.7rem;
-            padding: 0.2rem 0.5rem;
-            border-radius: 12px;
-            font-weight: 600;
-        }
-
-        .sidebar-footer {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 1.5rem;
-            border-top: 1px solid #e2e8f0;
-            background: white;
-        }
-
-        .logout-btn {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            width: 100%;
-            padding: 0.875rem 1.5rem;
-            background: transparent;
-            border: 1px solid #e2e8f0;
-            color: #64748b;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: 500;
-        }
-
-        .logout-btn:hover {
-            background: #fef2f2;
-            border-color: #fecaca;
-            color: #dc2626;
-        }
-
-        .logout-btn i {
-            font-size: 1.2rem;
-        }
-
-        /* Main Content */
-        .main-content {
-            margin-left: var(--sidebar-width);
-            margin-top: var(--navbar-height);
-            padding: 2rem;
-            min-height: calc(100vh - var(--navbar-height));
-            transition: all 0.3s ease;
-        }
-
-        /* Mobile Toggle */
-        .mobile-toggle {
-            display: none;
-            background: transparent;
-            border: none;
-            font-size: 1.5rem;
-            color: #64748b;
-            cursor: pointer;
-            padding: 0.5rem;
-        }
-
-        /* Responsive */
-        /* //!มือถือ */
-        @media (max-width: 576px) {
-            .main-content {
-                margin-left: 0;
-                padding: 1rem;
-                /* overflow-x: hidden; */
-            }
-
-            .main-content .container-fluid {
-                padding-left: 0;
-                padding-right: 0;
-            }
-        }
-
-        @media (max-width: 992px) {
-            .sidebar {
-                left: calc(var(--sidebar-width) * -1);
-            }
-
-            .sidebar.show {
-                left: 0;
-            }
-
-            .main-content {
-                margin-left: 0;
-            }
-
-            .mobile-toggle {
-                display: block;
-            }
-
-            .user-info {
-                display: none;
-            }
-
-            .top-navbar {
-                padding: 0 1rem;
-            }
-        }
-
-        /* Overlay for mobile */
-        .sidebar-overlay {
-            display: none;
-            position: fixed;
-            top: var(--navbar-height);
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 998;
-        }
-
-        .sidebar-overlay.show {
-            display: block;
-        }
-    </style>
     <style>
         .detail-card {
             background: white;
@@ -359,6 +106,9 @@
             font-weight: 700;
             color: #1e293b;
             margin-bottom: 1rem;
+
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
         .task-meta {
@@ -389,21 +139,6 @@
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-        }
-
-        .status-badge.pending {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .status-badge.in-progress {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
-        .status-badge.completed {
-            background: #d1fae5;
-            color: #065f46;
         }
 
         .category-badge {
@@ -723,6 +458,8 @@
 
         .timeline-text {
             color: #475569;
+            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
         .comments-container {
@@ -912,10 +649,10 @@
                                 แก้ไขงาน
                                 <!-- </button> -->
                             </a>
-                            <button class="btn btn-action btn-complete">
+                            <!-- <button class="btn btn-action btn-complete">
                                 <i class="bi bi-check-circle me-2"></i>
                                 เสร็จสิ้น
-                            </button>
+                            </button> -->
                             <button class="btn btn-action btn-delete">
                                 <i class="bi bi-trash me-2"></i>
                                 ลบงาน
@@ -993,221 +730,222 @@
     </script>
     <script>
         // Mock task data with more comments and activities
-        const taskData = {
-            id: 1,
-            title: "พัฒนาระบบ Login ใหม่",
-            description: "ออกแบบและพัฒนาระบบ Login ที่รองรับ OAuth 2.0\n\nต้องทำให้รองรับ:\n- Google Login\n- Facebook Login\n- Email/Password\n\nแท็ก: @สมชาย ใจดี @สมหญิง สวยงาม",
-            category: "development",
-            status: "in-progress",
-            importance: 5,
-            created_at: "2024-12-20 10:30:00",
-            updated_at: "2024-12-23 14:20:00",
-            team: [{
-                    id: 1,
-                    name: 'สมชาย ใจดี',
-                    role: 'Developer',
-                    avatar: 'SC'
-                },
-                {
-                    id: 2,
-                    name: 'สมหญิง สวยงาม',
-                    role: 'Designer',
-                    avatar: 'SS'
-                },
-                {
-                    id: 3,
-                    name: 'วิชัย รักงาน',
-                    role: 'Project Manager',
-                    avatar: 'WR'
-                }
-            ],
-            files: [{
-                    id: 1,
-                    name: 'login-mockup.pdf',
-                    size: 1024000,
-                    type: 'application/pdf'
-                },
-                {
-                    id: 2,
-                    name: 'design-spec.docx',
-                    size: 512000,
-                    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                },
-                {
-                    id: 3,
-                    name: 'screenshot.png',
-                    size: 2048000,
-                    type: 'image/png'
-                }
-            ],
-            allComments: [{
-                    id: 1,
-                    author: {
-                        name: 'สมชาย ใจดี',
-                        avatar: 'SC'
-                    },
-                    content: 'เริ่มทำ mockup เรียบร้อยแล้วครับ รอ review',
-                    created_at: '2024-12-21 09:15:00'
-                },
-                {
-                    id: 2,
-                    author: {
-                        name: 'วิชัย รักงาน',
-                        avatar: 'WR'
-                    },
-                    content: 'ดูดีมากครับ ขอเพิ่ม feature forgot password ด้วยนะครับ',
-                    created_at: '2024-12-21 14:30:00'
-                },
-                {
-                    id: 3,
-                    author: {
-                        name: 'สมหญิง สวยงาม',
-                        avatar: 'SS'
-                    },
-                    content: 'ผมเพิ่ม UI สำหรับ forgot password แล้วครับ',
-                    created_at: '2024-12-21 16:45:00'
-                },
-                {
-                    id: 4,
-                    author: {
-                        name: 'สมชาย ใจดี',
-                        avatar: 'SC'
-                    },
-                    content: 'OAuth Google ทำงานได้แล้วครับ กำลังทดสอบ Facebook',
-                    created_at: '2024-12-22 10:20:00'
-                },
-                {
-                    id: 5,
-                    author: {
-                        name: 'วิชัย รักงาน',
-                        avatar: 'WR'
-                    },
-                    content: 'ดีมากครับ ขอให้ทดสอบ edge cases ด้วยนะครับ',
-                    created_at: '2024-12-22 11:30:00'
-                },
-                {
-                    id: 6,
-                    author: {
-                        name: 'สมหญิง สวยงาม',
-                        avatar: 'SS'
-                    },
-                    content: 'พบ bug ตอน login ด้วย Facebook บนมือถือครับ',
-                    created_at: '2024-12-22 14:15:00'
-                },
-                {
-                    id: 7,
-                    author: {
-                        name: 'สมชาย ใจดี',
-                        avatar: 'SC'
-                    },
-                    content: 'แก้ bug Facebook login เรียบร้อยแล้วครับ',
-                    created_at: '2024-12-22 16:30:00'
-                },
-                {
-                    id: 8,
-                    author: {
-                        name: 'วิชัย รักงาน',
-                        avatar: 'WR'
-                    },
-                    content: 'ขอให้เพิ่ม unit test ด้วยครับ',
-                    created_at: '2024-12-23 09:00:00'
-                },
-                {
-                    id: 9,
-                    author: {
-                        name: 'สมชาย ใจดี',
-                        avatar: 'SC'
-                    },
-                    content: 'เพิ่ม unit test ครบทุก function แล้วครับ coverage 95%',
-                    created_at: '2024-12-23 14:20:00'
-                },
-                {
-                    id: 10,
-                    author: {
-                        name: 'วิชัย รักงาน',
-                        avatar: 'WR'
-                    },
-                    content: 'เยี่ยมมากครับ พร้อม deploy แล้ว',
-                    created_at: '2024-12-23 15:45:00'
-                }
-            ],
-            allActivity: [{
-                    type: 'created',
-                    text: 'สร้างงานโดย สมชาย ใจดี',
-                    time: '2024-12-20 10:30:00'
-                },
-                {
-                    type: 'status',
-                    text: 'เปลี่ยนสถานะเป็น กำลังดำเนินการ',
-                    time: '2024-12-20 11:00:00'
-                },
-                {
-                    type: 'comment',
-                    text: 'เพิ่มความคิดเห็นโดย สมชาย ใจดี',
-                    time: '2024-12-21 09:15:00'
-                },
-                {
-                    type: 'comment',
-                    text: 'เพิ่มความคิดเห็นโดย วิชัย รักงาน',
-                    time: '2024-12-21 14:30:00'
-                },
-                {
-                    type: 'comment',
-                    text: 'เพิ่มความคิดเห็นโดย สมหญิง สวยงาม',
-                    time: '2024-12-21 16:45:00'
-                },
-                {
-                    type: 'file',
-                    text: 'อัปโหลดไฟล์ login-mockup.pdf',
-                    time: '2024-12-22 09:00:00'
-                },
-                {
-                    type: 'comment',
-                    text: 'เพิ่มความคิดเห็นโดย สมชาย ใจดี',
-                    time: '2024-12-22 10:20:00'
-                },
-                {
-                    type: 'comment',
-                    text: 'เพิ่มความคิดเห็นโดย วิชัย รักงาน',
-                    time: '2024-12-22 11:30:00'
-                },
-                {
-                    type: 'file',
-                    text: 'อัปโหลดไฟล์ design-spec.docx',
-                    time: '2024-12-22 13:00:00'
-                },
-                {
-                    type: 'comment',
-                    text: 'เพิ่มความคิดเห็นโดย สมหญิง สวยงาม',
-                    time: '2024-12-22 14:15:00'
-                },
-                {
-                    type: 'comment',
-                    text: 'เพิ่มความคิดเห็นโดย สมชาย ใจดี',
-                    time: '2024-12-22 16:30:00'
-                },
-                {
-                    type: 'file',
-                    text: 'อัปโหลดไฟล์ screenshot.png',
-                    time: '2024-12-22 17:00:00'
-                },
-                {
-                    type: 'comment',
-                    text: 'เพิ่มความคิดเห็นโดย วิชัย รักงาน',
-                    time: '2024-12-23 09:00:00'
-                },
-                {
-                    type: 'comment',
-                    text: 'เพิ่มความคิดเห็นโดย สมชาย ใจดี',
-                    time: '2024-12-23 14:20:00'
-                },
-                {
-                    type: 'comment',
-                    text: 'เพิ่มความคิดเห็นโดย วิชัย รักงาน',
-                    time: '2024-12-23 15:45:00'
-                }
-            ]
-        };
+        const taskData = <?= json_encode($taskData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT); ?>;
+        // const taskData = {
+        //     id: 1,
+        //     title: "พัฒนาระบบ Login ใหม่",
+        //     description: "ออกแบบและพัฒนาระบบ Login ที่รองรับ OAuth 2.0\n\nต้องทำให้รองรับ:\n- Google Login\n- Facebook Login\n- Email/Password\n\nแท็ก: @สมชาย ใจดี @สมหญิง สวยงาม",
+        //     category: "development",
+        //     status: "in-progress",
+        //     importance: 5,
+        //     created_at: "2024-12-20 10:30:00",
+        //     updated_at: "2024-12-23 14:20:00",
+        //     team: [{
+        //             id: 1,
+        //             name: 'สมชาย ใจดี',
+        //             role: 'Developer',
+        //             avatar: 'SC'
+        //         },
+        //         {
+        //             id: 2,
+        //             name: 'สมหญิง สวยงาม',
+        //             role: 'Designer',
+        //             avatar: 'SS'
+        //         },
+        //         {
+        //             id: 3,
+        //             name: 'วิชัย รักงาน',
+        //             role: 'Project Manager',
+        //             avatar: 'WR'
+        //         }
+        //     ],
+        //     files: [{
+        //             id: 1,
+        //             name: 'login-mockup.pdf',
+        //             size: 1024000,
+        //             type: 'application/pdf'
+        //         },
+        //         {
+        //             id: 2,
+        //             name: 'design-spec.docx',
+        //             size: 512000,
+        //             type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        //         },
+        //         {
+        //             id: 3,
+        //             name: 'screenshot.png',
+        //             size: 2048000,
+        //             type: 'image/png'
+        //         }
+        //     ],
+        //     allComments: [{
+        //             id: 1,
+        //             author: {
+        //                 name: 'สมชาย ใจดี',
+        //                 avatar: 'SC'
+        //             },
+        //             content: 'เริ่มทำ mockup เรียบร้อยแล้วครับ รอ review',
+        //             created_at: '2024-12-21 09:15:00'
+        //         },
+        //         {
+        //             id: 2,
+        //             author: {
+        //                 name: 'วิชัย รักงาน',
+        //                 avatar: 'WR'
+        //             },
+        //             content: 'ดูดีมากครับ ขอเพิ่ม feature forgot password ด้วยนะครับ',
+        //             created_at: '2024-12-21 14:30:00'
+        //         },
+        //         {
+        //             id: 3,
+        //             author: {
+        //                 name: 'สมหญิง สวยงาม',
+        //                 avatar: 'SS'
+        //             },
+        //             content: 'ผมเพิ่ม UI สำหรับ forgot password แล้วครับ',
+        //             created_at: '2024-12-21 16:45:00'
+        //         },
+        //         {
+        //             id: 4,
+        //             author: {
+        //                 name: 'สมชาย ใจดี',
+        //                 avatar: 'SC'
+        //             },
+        //             content: 'OAuth Google ทำงานได้แล้วครับ กำลังทดสอบ Facebook',
+        //             created_at: '2024-12-22 10:20:00'
+        //         },
+        //         {
+        //             id: 5,
+        //             author: {
+        //                 name: 'วิชัย รักงาน',
+        //                 avatar: 'WR'
+        //             },
+        //             content: 'ดีมากครับ ขอให้ทดสอบ edge cases ด้วยนะครับ',
+        //             created_at: '2024-12-22 11:30:00'
+        //         },
+        //         {
+        //             id: 6,
+        //             author: {
+        //                 name: 'สมหญิง สวยงาม',
+        //                 avatar: 'SS'
+        //             },
+        //             content: 'พบ bug ตอน login ด้วย Facebook บนมือถือครับ',
+        //             created_at: '2024-12-22 14:15:00'
+        //         },
+        //         {
+        //             id: 7,
+        //             author: {
+        //                 name: 'สมชาย ใจดี',
+        //                 avatar: 'SC'
+        //             },
+        //             content: 'แก้ bug Facebook login เรียบร้อยแล้วครับ',
+        //             created_at: '2024-12-22 16:30:00'
+        //         },
+        //         {
+        //             id: 8,
+        //             author: {
+        //                 name: 'วิชัย รักงาน',
+        //                 avatar: 'WR'
+        //             },
+        //             content: 'ขอให้เพิ่ม unit test ด้วยครับ',
+        //             created_at: '2024-12-23 09:00:00'
+        //         },
+        //         {
+        //             id: 9,
+        //             author: {
+        //                 name: 'สมชาย ใจดี',
+        //                 avatar: 'SC'
+        //             },
+        //             content: 'เพิ่ม unit test ครบทุก function แล้วครับ coverage 95%',
+        //             created_at: '2024-12-23 14:20:00'
+        //         },
+        //         {
+        //             id: 10,
+        //             author: {
+        //                 name: 'วิชัย รักงาน',
+        //                 avatar: 'WR'
+        //             },
+        //             content: 'เยี่ยมมากครับ พร้อม deploy แล้ว',
+        //             created_at: '2024-12-23 15:45:00'
+        //         }
+        //     ],
+        //     allActivity: [{
+        //             type: 'created',
+        //             text: 'สร้างงานโดย สมชาย ใจดี',
+        //             time: '2024-12-20 10:30:00'
+        //         },
+        //         {
+        //             type: 'status',
+        //             text: 'เปลี่ยนสถานะเป็น กำลังดำเนินการ',
+        //             time: '2024-12-20 11:00:00'
+        //         },
+        //         {
+        //             type: 'comment',
+        //             text: 'เพิ่มความคิดเห็นโดย สมชาย ใจดี',
+        //             time: '2024-12-21 09:15:00'
+        //         },
+        //         {
+        //             type: 'comment',
+        //             text: 'เพิ่มความคิดเห็นโดย วิชัย รักงาน',
+        //             time: '2024-12-21 14:30:00'
+        //         },
+        //         {
+        //             type: 'comment',
+        //             text: 'เพิ่มความคิดเห็นโดย สมหญิง สวยงาม',
+        //             time: '2024-12-21 16:45:00'
+        //         },
+        //         {
+        //             type: 'file',
+        //             text: 'อัปโหลดไฟล์ login-mockup.pdf',
+        //             time: '2024-12-22 09:00:00'
+        //         },
+        //         {
+        //             type: 'comment',
+        //             text: 'เพิ่มความคิดเห็นโดย สมชาย ใจดี',
+        //             time: '2024-12-22 10:20:00'
+        //         },
+        //         {
+        //             type: 'comment',
+        //             text: 'เพิ่มความคิดเห็นโดย วิชัย รักงาน',
+        //             time: '2024-12-22 11:30:00'
+        //         },
+        //         {
+        //             type: 'file',
+        //             text: 'อัปโหลดไฟล์ design-spec.docx',
+        //             time: '2024-12-22 13:00:00'
+        //         },
+        //         {
+        //             type: 'comment',
+        //             text: 'เพิ่มความคิดเห็นโดย สมหญิง สวยงาม',
+        //             time: '2024-12-22 14:15:00'
+        //         },
+        //         {
+        //             type: 'comment',
+        //             text: 'เพิ่มความคิดเห็นโดย สมชาย ใจดี',
+        //             time: '2024-12-22 16:30:00'
+        //         },
+        //         {
+        //             type: 'file',
+        //             text: 'อัปโหลดไฟล์ screenshot.png',
+        //             time: '2024-12-22 17:00:00'
+        //         },
+        //         {
+        //             type: 'comment',
+        //             text: 'เพิ่มความคิดเห็นโดย วิชัย รักงาน',
+        //             time: '2024-12-23 09:00:00'
+        //         },
+        //         {
+        //             type: 'comment',
+        //             text: 'เพิ่มความคิดเห็นโดย สมชาย ใจดี',
+        //             time: '2024-12-23 14:20:00'
+        //         },
+        //         {
+        //             type: 'comment',
+        //             text: 'เพิ่มความคิดเห็นโดย วิชัย รักงาน',
+        //             time: '2024-12-23 15:45:00'
+        //         }
+        //     ]
+        // };
 
         // Pagination variables
         let commentsPerPage = 5;
@@ -1222,7 +960,6 @@
             // Task Meta
             const metaHtml = `
                 <span class="status-badge ${taskData.status}">
-                    <i class="bi bi-circle-fill"></i>
                     ${getStatusName(taskData.status)}
                 </span>
                 <span class="category-badge">
@@ -1234,7 +971,7 @@
                 </span>
                 <span class="meta-item">
                     <i class="bi bi-hash"></i>
-                    TASK-2024-${taskData.id.toString().padStart(4, '0')}
+                    TASK-${taskData.id.toString().padStart(4, '0')}
                 </span>
                 <span class="meta-item">
                     <i class="bi bi-calendar3"></i>
@@ -1242,7 +979,7 @@
                 </span>
                 <span class="meta-item">
                     <i class="bi bi-flag-fill"></i>
-                    ${formatDate(taskData.created_at)}
+                    ${formatDate(taskData.due_date)}
                 </span>
             `;
             document.getElementById('taskMeta').innerHTML = metaHtml;
@@ -1250,7 +987,7 @@
             // Description
             let description = taskData.description;
             taskData.team.forEach(member => {
-                const mentionPattern = `@${member.name}`;
+                const mentionPattern = `@${member.fd_user_fullname}`;
                 description = description.replace(
                     new RegExp(mentionPattern, 'g'),
                     `<span class="mention-tag">${mentionPattern}</span>`
@@ -1259,16 +996,28 @@
             document.getElementById('taskDescription').innerHTML = description;
 
             // Team Members
-            const teamHtml = taskData.team.map(member => `
-                <div class="user-card">
-                    <div class="user-avatar">${member.avatar}</div>
-                    <div class="user-info">
-                        <div class="user-name">${member.name}</div>
-                        <div class="user-role">${member.role}</div>
+            let teamHtml = '';
+
+            if (taskData.team.length === 0) {
+                teamHtml = `
+                    <div class="empty-state">
+                        <p>ยังไม่มีความผู้เกี่ยวข้อง</p>
                     </div>
-                </div>
-            `).join('');
+                `;
+            } else {
+                teamHtml = taskData.team.map(member => `
+                    <div class="user-card">
+                        <div class="user-avatar">${member.avatar}</div>
+                        <div class="user-info">
+                            <div class="user-name">${member.fd_user_fullname}</div>
+                            <div class="user-role">${member.fd_dept_name}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
             document.getElementById('teamMembers').innerHTML = teamHtml;
+
 
             // Files
             if (taskData.files.length > 0) {
@@ -1278,13 +1027,13 @@
                 const filesHtml = taskData.files.map(file => `
                     <div class="file-card">
                         <div class="file-icon">
-                            <i class="bi bi-${getFileIcon(file.type)}"></i>
+                            <i class="bi bi-${getFileIcon(file.fd_file_type)}"></i>
                         </div>
                         <div class="file-info">
-                            <div class="file-name">${file.name}</div>
-                            <div class="file-meta">${formatFileSize(file.size)}</div>
+                            <div class="file-name">${file.fd_file_original_name}</div>
+                            <div class="file-meta">${formatFileSize(file.fd_file_size)}</div>
                         </div>
-                        <button class="btn-download" onclick="downloadFile(${file.id})">
+                        <button class="btn-download" onclick="downloadFile(${file.fd_file_id})">
                             <i class="bi bi-download"></i>
                         </button>
                     </div>
@@ -1394,11 +1143,11 @@
             const activityHtml = activityToShow.map(item => `
                 <div class="timeline-item">
                     <div class="timeline-icon">
-                        <i class="bi bi-${getActivityIcon(item.type)}"></i>
+                        <i class="bi bi-${getActivityIcon(item.fd_topic_log_type)}"></i>
                     </div>
                     <div class="timeline-content">
-                        <div class="timeline-time">${formatDate(item.time)}</div>
-                        <div class="timeline-text">${item.text}</div>
+                        <div class="timeline-time">${formatDate(item.fd_topic_log_time)}</div>
+                        <div class="timeline-text">${item.fd_topic_log_text}</div>
                     </div>
                 </div>
             `).join('');
@@ -1440,9 +1189,9 @@
 
         function getStatusName(status) {
             const statuses = {
-                'pending': 'รอดำเนินการ',
-                'in-progress': 'กำลังดำเนินการ',
-                'completed': 'เสร็จสิ้น'
+                'pending': '<i class="bi bi-clock"></i>รอดำเนินการ',
+                'in-progress': '<i class="bi bi-arrow-repeat"></i>กำลังดำเนินการ',
+                'completed': '<i class="bi bi-check-circle-fill"></i>เสร็จสิ้น'
             };
             return statuses[status] || 'ไม่ทราบสถานะ';
         }
@@ -1456,6 +1205,7 @@
         }
 
         function formatDate(dateString) {
+            if (dateString === null) return '-';
             const date = new Date(dateString);
             const options = {
                 year: 'numeric',
