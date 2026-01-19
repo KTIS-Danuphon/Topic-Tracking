@@ -14,7 +14,43 @@ $fileUploader = new SecureFileUpload('files_upload/tasks/'); // กำหนด�
 $now = new DateTime();
 
 $formatted_now = $now->format('Y-m-d H:i:s');
+function normalizeUserIds($data)
+{
+    // ถ้าเป็น array อยู่แล้ว
+    if (is_array($data)) {
+        return array_values(array_unique(array_map('intval', $data)));
+    }
 
+    // ถ้าเป็น string
+    if (is_string($data)) {
+        $data = trim($data);
+
+        if ($data === '') {
+            return [];
+        }
+
+        // ลอง decode แบบ JSON ก่อน (รองรับ [2,3,5\n])
+        $decoded = json_decode($data, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return array_values(array_unique(array_map('intval', $decoded)));
+        }
+
+        // fallback กรณีไม่ใช่ JSON
+        $data = trim($data, "[] \r\n\t");
+        if ($data === '') {
+            return [];
+        }
+
+        return array_values(
+            array_unique(
+                array_map('intval', explode(',', $data))
+            )
+        );
+    }
+
+    // กรณีอื่น ๆ
+    return [];
+}
 
 try {
     // ตรวจสอบ POST data
@@ -120,19 +156,106 @@ try {
                 }
             }
 
+            // 3. บันทึก Log กิจกรรม
+            if (!empty($taskID)) {
+                require_once 'task_log.php';
+                Task_log($taskID, 'created', $_SESSION['user_fullname'], $object, $formatted_now);
+                //  echo "พบ Task ID สำหรับบันทึก Log".$taskID;
+                // exit();
+            } else {
+                echo "ไม่พบ Task ID สำหรับบันทึก Log" . $taskID;
+                exit();
+            }
 
+            $arr_mentionedUsers = normalizeUserIds($mentionedUsers);
+            $arr_additionalUsers = normalizeUserIds($additionalUsers);
+
+            if (!empty($arr_additionalUsers) && is_array($arr_additionalUsers)) { //ถ้ามีผู้เข้าร่วมงาน จะสร้างแจ้งเตือน
+
+                //ผู้ที่ มีส่วนร่วมและโดนกล่าวถึง
+                $participatedAndMentioned = array_values(
+                    array_intersect($arr_additionalUsers, $arr_mentionedUsers)
+                );
+
+                //เพิ่มแจ้งเตือน หลัก tb_notifications_c050968
+                $massage_main_noti = 'มีงานใหม่ "' . $taskTitle . '" ถูกสร้างขึ้นโดย ' . $_SESSION['user_fullname'] . '.';
+                $table = 'tb_notifications_c050968';
+
+                $notiData = [
+                    'fd_sender_id' => $createdBy,
+                    'fd_task_id' => $taskID,
+                    'fd_title' => 'สร้างงานใหม่',
+                    'fd_message' => $massage_main_noti,
+                    'fd_icontype' => 'new_task',
+                    // 'fd_is_deleted ' => '0',//สถานะการลบโดยผู้ส่ง: 0=ปกติ, 1=ถอนแจ้งเตือน 	
+                    // 'fd_deleted_at' => null,วันที่ลบโดยผู้สร้าง
+                    'fd_created_at' => $formatted_now
+                ];
+                $main_notiID = $object->Insert_Data($table, $notiData);
+
+                //เพิ่มแจ้งเตือน รายบุคคล tb_notification_users_c050968
+                $table_detail = 'tb_notification_users_c050968';
+                $massage_additional = 'คุณถูกเพิ่มในส่วนร่วมไร่วมงานใหม่ "' . $taskTitle . '" โดย ' . $_SESSION['user_fullname'] . '.'; //ผู้ที่มีส่วนร่วมแต่ไม่ถูกกล่าวถึง
+                foreach ($arr_additionalUsers as $UsersID) { //ผู้ที่มีส่วนร่วมทั้งหมด
+                    $noti_user_Data = [
+                        'fd_notification_id' => $main_notiID,
+                        'fd_user_id' => $UsersID,
+                        // 'fd_is_read ' => '0', //สถานะการอ่าน: 0=ยังไม่อ่าน, 1=อ่านแล้ว
+                        // 'fd_read_at' => null, //วันที่อ่าน
+                        // 'fd_is_deleted ' => '0',//สถานะการลบโดยผู้รับ: 0=ปกติ, 1=ถอนแจ้งเตือน
+                        // 'fd_deleted_at' => null, //วันที่ลบโดยผู้รับ
+                        'fd_created_at' => $formatted_now
+                    ];
+                    $user_notiID = $object->Insert_Data($table_detail, $noti_user_Data);
+                }
+
+                //ผู้ที่มีส่วนร่วมและถูกกล่าวถึง
+                if (!empty($participatedAndMentioned) && is_array($participatedAndMentioned)) {
+                    $masssage_mentioned = 'คุณถูกกล่าวถึงในงานใหม่ "' . $taskTitle . '" โดย ' . $_SESSION['user_fullname'] . '.';
+
+                    $table = 'tb_notifications_c050968';
+                    $notiData = [
+                        'fd_sender_id' => $createdBy,
+                        'fd_task_id' => $taskID,
+                        'fd_title' => 'การกล่าวถึงในงานใหม่',
+                        'fd_message' => $masssage_mentioned,
+                        'fd_icontype' => 'tag_mention',
+                        // 'fd_is_deleted ' => '0',//สถานะการลบโดยผู้ส่ง: 0=ปกติ, 1=ถอนแจ้งเตือน 	
+                        // 'fd_deleted_at' => null, วันที่ลบโดยผู้สร้าง
+                        'fd_created_at' => $formatted_now
+                    ];
+                    $main_notiID = $object->Insert_Data($table, $notiData);
+
+                    $table_detail = 'tb_notification_users_c050968';
+                    foreach ($participatedAndMentioned as $UsersID) {
+
+                        $noti_user_Data = [
+                            'fd_notification_id' => $main_notiID,
+                            'fd_user_id' => $UsersID,
+                            // 'fd_is_read ' => '0',//สถานะการอ่าน: 0=ยังไม่อ่าน, 1=อ่านแล้ว
+                            // 'fd_read_at' => null, //วันที่อ่าน
+                            // 'fd_is_deleted ' => '0',//สถานะการลบโดยผู้รับ: 0=ปกติ, 1=ถอนแจ้งเตือน
+                            // 'fd_deleted_at' => null, //วันที่ลบโดยผู้รับ
+                            'fd_created_at' => $formatted_now
+                        ];
+                        $user_notiID = $object->Insert_Data($table_detail, $noti_user_Data);
+                    }
+                }
+            }
             // Commit Transaction
 
-            // ตั้งค่าผลลัพธ์
-            if (!empty($uploadErrors)) {
+            $hasFiles = !empty(array_filter($_FILES['files']['tmp_name'] ?? []));
+
+            if (!$hasFiles) {
+                $iconType = 'success';
+                $errorMessage = 'บันทึก Task สำเร็จ (ไม่มีไฟล์แนบ)';
+            } elseif (!empty($uploadErrors)) {
                 $iconType = 'warning';
-                $errorMessage = 'บันทึก Task สำเร็จ แต่มีไฟล์บางไฟล์อัปโหลดไม่สำเร็จ: ' . implode(', ', $uploadErrors);
+                $errorMessage = 'บันทึก Task สำเร็จ แต่มีไฟล์บางไฟล์อัปโหลดไม่สำเร็จ: '
+                    . implode(', ', $uploadErrors);
             } else {
                 $iconType = 'success';
-            }
-            if (empty($_FILES['files']['tmp_name'][0])) {
-                $iconType = 'warning';
-                $errorMessage = 'บันทึก Task สำเร็จ แต่มีไฟล์บางไฟล์อัปโหลดไม่สำเร็จ: ' . implode(', ', $uploadErrors);
+                $errorMessage = 'บันทึก Task สำเร็จ';
             }
         } catch (Exception $e) {
             // Rollback ถ้ามีข้อผิดพลาด
