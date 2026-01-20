@@ -23,7 +23,16 @@ switch ($_SESSION['user_status']) {
     //user → เห็นเฉพาะคนอื่นในแผนกเดียวกัน มีสถานะเป็น user และ active
     case 'user':
     default:
-        $where = 'WHERE fd_topic_creaed_by = "' . $_SESSION['user_id'] . '" AND fd_topic_active = "1" AND fd_topic_importance LIKE "[' . $_SESSION['user_id'] . ',%" OR fd_topic_importance LIKE "%,' . $_SESSION['user_id'] . ']" OR fd_topic_importance LIKE "%,' . $_SESSION['user_id'] . ',%" OR fd_topic_importance = "[' . $_SESSION['user_id'] . ']" ';
+        $userId = (int) $_SESSION['user_id'];
+
+        $where  = 'WHERE fd_topic_active = 1 ';
+        $where .= 'AND ( ';
+        $where .= 'fd_topic_created_by = ' . $userId . ' ';
+        $where .= 'OR fd_topic_participant  = "[' . $userId . ']" ';
+        $where .= 'OR fd_topic_participant  LIKE "[' . $userId . ',%" ';
+        $where .= 'OR fd_topic_participant  LIKE "%,' . $userId . ',%" ';
+        $where .= 'OR fd_topic_participant  LIKE "%,' . $userId . ']" ';
+        $where .= ') ';
         break;
 }
 $where .= ' ORDER BY fd_topic_created_at DESC ';
