@@ -1,4 +1,89 @@
-<?php include 'session_check.php'; ?>
+<?php
+include 'session_check.php';
+date_default_timezone_set('Asia/Bangkok');
+
+require_once 'class/crud.class.php';
+require_once 'class/util.class.php';
+require_once 'class/encrypt.class.php';
+
+$object   = new CRUD();
+$util     = new Util();
+$Encrypt  = new Encrypt_data();
+$now = new DateTime();
+$formatted_now = $now->format('Y-m-d H:i:s');
+
+$table = 'tb_notifications_c050968 nt';
+$fields = 'nt.fd_notification_id, nt.fd_task_id, nt.fd_title, nt.fd_message, nt.fd_icontype, nt.fd_created_at, ntu.fd_is_read  ';
+$where = 'LEFT JOIN tb_notification_users_c050968 ntu ON ntu.fd_notification_id = nt.fd_notification_id ';
+$where .= 'WHERE nt.fd_is_deleted = "0" AND ntu.fd_user_id = "' . $_SESSION['user_id'] . '" AND ntu.fd_is_deleted = "0" ';
+$where .= 'ORDER BY nt.fd_created_at DESC ';
+$result_notification = $object->ReadData($table, $fields, $where);
+$notification = [];
+
+function timeAgoTH($datetime)//ฟังก์ชันแปลงเวลาเป็นข้อความภาษาไทย
+{
+    $tz   = new DateTimeZone('Asia/Bangkok');
+    $now  = new DateTime('now', $tz);
+    $time = new DateTime($datetime, $tz);
+
+    $diff = $now->getTimestamp() - $time->getTimestamp();
+
+    if ($diff < 60) {
+        return 'เมื่อสักครู่';
+    }
+
+    if ($diff < 3600) {
+        return floor($diff / 60) . ' นาทีที่แล้ว';
+    }
+
+    if ($diff < 86400) {
+        return floor($diff / 3600) . ' ชั่วโมงที่แล้ว';
+    }
+
+    if ($diff < 604800) { // 7 วัน
+        return floor($diff / 86400) . ' วันที่แล้ว';
+    }
+
+    // ---------- มากกว่า 7 วัน ----------
+    $thaiMonths = [
+        1 => 'ม.ค', 2 => 'ก.พ', 3 => 'มี.ค', 4 => 'เม.ย',
+        5 => 'พ.ค', 6 => 'มิ.ย', 7 => 'ก.ค', 8 => 'ส.ค',
+        9 => 'ก.ย', 10 => 'ต.ค', 11 => 'พ.ย', 12 => 'ธ.ค'
+    ];
+
+    $day   = $time->format('d');
+    $month = $thaiMonths[(int)$time->format('m')];
+    $year  = (int)$time->format('Y') + 543; // พ.ศ.
+    $hour  = $time->format('H:i');
+
+    return "{$day} {$month} {$year} {$hour}";
+}
+
+foreach ($result_notification as $row) {
+    $is_read = '';
+    switch ($row['fd_is_read']) { //สถานะการอ่าน: 0=ยังไม่ได้อ่าน, 1=อ่านแล้ว
+        case '0':
+            $is_read  = false; // ยังไม่ได้อ่าน
+            break;
+        case '1':
+            $is_read  = true; // อ่านแล้ว
+            break;
+        default:
+            $is_read  = false; // ค่าเริ่มต้น
+            break;
+    }
+    $notification[] = [
+        'id' =>  $row['fd_notification_id'], //id แจ้งเตือน
+        'type' => $row['fd_icontype'], //ประเภทแจ้งเตือน
+        'title' => $row['fd_title'], //หัวข้อแจ้งเตือน
+        'message' => $row['fd_message'], //ข้อความแจ้งเตือน
+        'time' => timeAgoTH($row['fd_created_at']), //เวลาที่แจ้งเตือน
+        'isRead' =>  $is_read, //สถานะการอ่าน
+        'taskId' => $row['fd_task_id'], //id งานที่เกี่ยวข้อง
+        'encrypt_id' => $Encrypt->EnCrypt_pass($row['fd_task_id']), //เข้ารหัส id งาน
+    ];
+}
+?>
 <!DOCTYPE html>
 <html lang="th">
 
@@ -448,6 +533,8 @@
             }
         }
 
+
+
         @media (max-width: 992px) {
             .sidebar {
                 left: calc(var(--sidebar-width) * -1);
@@ -696,7 +783,7 @@
 
         .unread-badge {
             position: absolute;
-            top: 1rem;
+            top: 0.1rem;
             right: 1rem;
             background: #ef4444;
             color: white;
@@ -737,6 +824,62 @@
             border-color: var(--primary-color);
             background: rgba(102, 126, 234, 0.05);
         }
+
+        @media (max-width: 576px) {
+             .unread-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: #ef4444;
+            color: white;
+            font-size: 0.65rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+            .notification-item {
+                flex-direction: row;
+                align-items: flex-start;
+            }
+
+            .notification-content {
+                width: 100%;
+            }
+
+            /* ให้ header เรียงบน-ล่าง ไม่แย่งพื้นที่ */
+            .notification-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.25rem;
+            }
+
+            /* เวลาไปอยู่บรรทัดล่าง */
+            .notification-time {
+                margin-left: 0;
+                font-size: 0.75rem;
+            }
+
+            /* ข้อความกินเต็ม */
+            .notification-message {
+                width: 100%;
+                display: block;
+                word-break: break-word;
+            }
+
+            /* ปุ่มเรียงลง */
+            .notification-actions-btn {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            .notification-icon {
+                width: 44px;
+                height: 44px;
+                font-size: 1.25rem;
+            }
+        }
+
 
         @media (max-width: 992px) {
             .sidebar {
@@ -832,142 +975,143 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Mock notifications data
-        const allNotifications = [{
-                id: 1,
-                type: 'task',
-                title: 'งานใหม่ถูกมอบหมายให้คุณ',
-                message: 'สมชาย ใจดี มอบหมายงาน "พัฒนาระบบ Login ใหม่" ให้กับคุณ',
-                time: '5 นาทีที่แล้ว',
-                isRead: false,
-                taskId: 'abc123'
-            },
-            {
-                id: 2,
-                type: 'comment',
-                title: 'ความคิดเห็นใหม่ในงานของคุณ',
-                message: 'วิชัย รักงาน แสดงความคิดเห็นในงาน "ออกแบบ UI Dashboard"',
-                time: '15 นาทีที่แล้ว',
-                isRead: false,
-                taskId: 'def456'
-            },
-            {
-                id: 3,
-                type: 'mention',
-                title: 'คุณถูกกล่าวถึงในความคิดเห็น',
-                message: '@คุณ สมหญิง สวยงาม กล่าวถึงคุณใน: "ขอให้ช่วยตรวจสอบ design ด้วยครับ"',
-                time: '1 ชั่วโมงที่แล้ว',
-                isRead: false,
-                taskId: 'ghi789'
-            },
-            {
-                id: 4,
-                type: 'deadline',
-                title: 'งานใกล้ครบกำหนด',
-                message: 'งาน "จัดทำเอกสาร API Documentation" จะครบกำหนดในอีก 2 วัน',
-                time: '2 ชั่วโมงที่แล้ว',
-                isRead: false,
-                taskId: 'jkl012'
-            },
-            {
-                id: 5,
-                type: 'task',
-                title: 'สถานะงานถูกเปลี่ยน',
-                message: 'งาน "แก้ไข Bug หน้า Profile" ถูกเปลี่ยนสถานะเป็น "เสร็จสิ้น"',
-                time: '3 ชั่วโมงที่แล้ว',
-                isRead: true,
-                taskId: 'mno345'
-            },
-            {
-                id: 6,
-                type: 'comment',
-                title: 'ความคิดเห็นใหม่',
-                message: 'มานี มีเงิน: "ขอให้เพิ่มรายละเอียดในส่วน marketing strategy ด้วยครับ"',
-                time: '5 ชั่วโมงที่แล้ว',
-                isRead: false,
-                taskId: 'pqr678'
-            },
-            {
-                id: 7,
-                type: 'system',
-                title: 'อัปเดตระบบเสร็จสิ้น',
-                message: 'ระบบได้รับการอัปเดตเป็นเวอร์ชัน 2.1.0 เพิ่มฟีเจอร์ใหม่หลายอย่าง',
-                time: '1 วันที่แล้ว',
-                isRead: true,
-                taskId: null
-            },
-            {
-                id: 8,
-                type: 'mention',
-                title: 'ถูกแท็กในงานใหม่',
-                message: '@คุณ ถูกแท็กในงาน "วางแผนการตลาดออนไลน์"',
-                time: '1 วันที่แล้ว',
-                isRead: false,
-                taskId: 'stu901'
-            },
-            {
-                id: 9,
-                type: 'task',
-                title: 'งานใหม่จากทีม',
-                message: 'ทีม Marketing สร้างงาน "วิเคราะห์ข้อมูล Campaign Q4"',
-                time: '1 วันที่แล้ว',
-                isRead: true,
-                taskId: 'vwx234'
-            },
-            {
-                id: 10,
-                type: 'comment',
-                title: 'การตอบกลับความคิดเห็น',
-                message: 'ประเสริฐ ดีเด่น ตอบกลับความคิดเห็นของคุณในงาน "ประชุมทีม"',
-                time: '2 วันที่แล้ว',
-                isRead: true,
-                taskId: 'yza567'
-            },
-            {
-                id: 11,
-                type: 'system',
-                title: 'การสำรองข้อมูลเสร็จสิ้น',
-                message: 'ระบบได้ทำการสำรองข้อมูลอัตโนมัติเรียบร้อยแล้ว',
-                time: '2 วันที่แล้ว',
-                isRead: true,
-                taskId: null
-            },
-            {
-                id: 12,
-                type: 'deadline',
-                title: 'เตือนความจำ: งานครบกำหนดพรุ่งนี้',
-                message: 'งาน "ออกแบบโลโก้ใหม่" จะครบกำหนดในวันพรุ่งนี้',
-                time: '3 วันที่แล้ว',
-                isRead: true,
-                taskId: 'bcd890'
-            },
-            {
-                id: 13,
-                type: 'task',
-                title: 'งานถูกลบ',
-                message: 'วิชัย รักงาน ลบงาน "ทดสอบระบบ Alpha"',
-                time: '3 วันที่แล้ว',
-                isRead: true,
-                taskId: null
-            },
-            {
-                id: 14,
-                type: 'mention',
-                title: 'การกล่าวถึงในงาน',
-                message: '@คุณ ถูกกล่าวถึงในงาน "Review Code Sprint 10"',
-                time: '4 วันที่แล้ว',
-                isRead: false,
-                taskId: 'efg123'
-            },
-            {
-                id: 15,
-                type: 'system',
-                title: 'การบำรุงรักษาระบบ',
-                message: 'ระบบจะปิดบำรุงรักษาในวันเสาร์ที่ 30 ธันวาคม เวลา 02:00-04:00 น.',
-                time: '5 วันที่แล้ว',
-                isRead: true,
-                taskId: null
-            }
-        ];
+        // const allNotifications = [{
+        //         id: 1,
+        //         type: 'task',
+        //         title: 'งานใหม่ถูกมอบหมายให้คุณ',
+        //         message: 'สมชาย ใจดี มอบหมายงาน "พัฒนาระบบ Login ใหม่" ให้กับคุณ',
+        //         time: '5 นาทีที่แล้ว',
+        //         isRead: false,
+        //         taskId: 'abc123'
+        //     },
+        //     {
+        //         id: 2,
+        //         type: 'comment',
+        //         title: 'ความคิดเห็นใหม่ในงานของคุณ',
+        //         message: 'วิชัย รักงาน แสดงความคิดเห็นในงาน "ออกแบบ UI Dashboard"',
+        //         time: '15 นาทีที่แล้ว',
+        //         isRead: false,
+        //         taskId: 'def456'
+        //     },
+        //     {
+        //         id: 3,
+        //         type: 'mention',
+        //         title: 'คุณถูกกล่าวถึงในความคิดเห็น',
+        //         message: '@คุณ สมหญิง สวยงาม กล่าวถึงคุณใน: "ขอให้ช่วยตรวจสอบ design ด้วยครับ"',
+        //         time: '1 ชั่วโมงที่แล้ว',
+        //         isRead: false,
+        //         taskId: 'ghi789'
+        //     },
+        //     {
+        //         id: 4,
+        //         type: 'deadline',
+        //         title: 'งานใกล้ครบกำหนด',
+        //         message: 'งาน "จัดทำเอกสาร API Documentation" จะครบกำหนดในอีก 2 วัน',
+        //         time: '2 ชั่วโมงที่แล้ว',
+        //         isRead: false,
+        //         taskId: 'jkl012'
+        //     },
+        //     {
+        //         id: 5,
+        //         type: 'task',
+        //         title: 'สถานะงานถูกเปลี่ยน',
+        //         message: 'งาน "แก้ไข Bug หน้า Profile" ถูกเปลี่ยนสถานะเป็น "เสร็จสิ้น"',
+        //         time: '3 ชั่วโมงที่แล้ว',
+        //         isRead: true,
+        //         taskId: 'mno345'
+        //     },
+        //     {
+        //         id: 6,
+        //         type: 'comment',
+        //         title: 'ความคิดเห็นใหม่',
+        //         message: 'มานี มีเงิน: "ขอให้เพิ่มรายละเอียดในส่วน marketing strategy ด้วยครับ"',
+        //         time: '5 ชั่วโมงที่แล้ว',
+        //         isRead: false,
+        //         taskId: 'pqr678'
+        //     },
+        //     {
+        //         id: 7,
+        //         type: 'system',
+        //         title: 'อัปเดตระบบเสร็จสิ้น',
+        //         message: 'ระบบได้รับการอัปเดตเป็นเวอร์ชัน 2.1.0 เพิ่มฟีเจอร์ใหม่หลายอย่าง',
+        //         time: '1 วันที่แล้ว',
+        //         isRead: true,
+        //         taskId: null
+        //     },
+        //     {
+        //         id: 8,
+        //         type: 'mention',
+        //         title: 'ถูกแท็กในงานใหม่',
+        //         message: '@คุณ ถูกแท็กในงาน "วางแผนการตลาดออนไลน์"',
+        //         time: '1 วันที่แล้ว',
+        //         isRead: false,
+        //         taskId: 'stu901'
+        //     },
+        //     {
+        //         id: 9,
+        //         type: 'task',
+        //         title: 'งานใหม่จากทีม',
+        //         message: 'ทีม Marketing สร้างงาน "วิเคราะห์ข้อมูล Campaign Q4"',
+        //         time: '1 วันที่แล้ว',
+        //         isRead: true,
+        //         taskId: 'vwx234'
+        //     },
+        //     {
+        //         id: 10,
+        //         type: 'comment',
+        //         title: 'การตอบกลับความคิดเห็น',
+        //         message: 'ประเสริฐ ดีเด่น ตอบกลับความคิดเห็นของคุณในงาน "ประชุมทีม"',
+        //         time: '2 วันที่แล้ว',
+        //         isRead: true,
+        //         taskId: 'yza567'
+        //     },
+        //     {
+        //         id: 11,
+        //         type: 'system',
+        //         title: 'การสำรองข้อมูลเสร็จสิ้น',
+        //         message: 'ระบบได้ทำการสำรองข้อมูลอัตโนมัติเรียบร้อยแล้ว',
+        //         time: '2 วันที่แล้ว',
+        //         isRead: true,
+        //         taskId: null
+        //     },
+        //     {
+        //         id: 12,
+        //         type: 'deadline',
+        //         title: 'เตือนความจำ: งานครบกำหนดพรุ่งนี้',
+        //         message: 'งาน "ออกแบบโลโก้ใหม่" จะครบกำหนดในวันพรุ่งนี้',
+        //         time: '3 วันที่แล้ว',
+        //         isRead: true,
+        //         taskId: 'bcd890'
+        //     },
+        //     {
+        //         id: 13,
+        //         type: 'task',
+        //         title: 'งานถูกลบ',
+        //         message: 'วิชัย รักงาน ลบงาน "ทดสอบระบบ Alpha"',
+        //         time: '3 วันที่แล้ว',
+        //         isRead: true,
+        //         taskId: null
+        //     },
+        //     {
+        //         id: 14,
+        //         type: 'mention',
+        //         title: 'การกล่าวถึงในงาน',
+        //         message: '@คุณ ถูกกล่าวถึงในงาน "Review Code Sprint 10"',
+        //         time: '4 วันที่แล้ว',
+        //         isRead: false,
+        //         taskId: 'efg123'
+        //     },
+        //     {
+        //         id: 15,
+        //         type: 'system',
+        //         title: 'การบำรุงรักษาระบบ',
+        //         message: 'ระบบจะปิดบำรุงรักษาในวันเสาร์ที่ 30 ธันวาคม เวลา 02:00-04:00 น.',
+        //         time: '5 วันที่แล้ว',
+        //         isRead: true,
+        //         taskId: null
+        //     }
+        // ];
+        const allNotifications = <?php echo json_encode($notification); ?>;
 
         let currentFilter = 'all';
         let displayedCount = 10;
@@ -975,11 +1119,11 @@
 
         function getIconClass(type) {
             const icons = {
-                'task': 'bi-list-task',
-                'comment': 'bi-chat-dots',
-                'mention': 'bi-at',
-                'system': 'bi-gear',
-                'deadline': 'bi-exclamation-triangle'
+                'task': 'bi-list-task', //ไอคอนงาน
+                'comment': 'bi-chat-dots', //ไอคอนความคิดเห็น
+                'mention': 'bi-at', //ไอคอนการกล่าวถึง
+                'system': 'bi-gear', //ไอคอนระบบ
+                'deadline': 'bi-exclamation-triangle' //
             };
             return icons[type] || 'bi-bell';
         }
@@ -1018,7 +1162,7 @@
                         ${notification.taskId ? `
                             <div class="notification-actions-btn">
                                 <button class="btn btn-sm btn-primary btn-notification" 
-                                        onclick="event.stopPropagation(); viewTask('${notification.taskId}')">
+                                        onclick="event.stopPropagation(); viewTask('${notification.encrypt_id}')">
                                     <i class="bi bi-eye me-1"></i>ดูรายละเอียด
                                 </button>
                                 <button class="btn btn-sm btn-outline-secondary btn-notification" 
@@ -1107,7 +1251,7 @@
         }
 
         function viewTask(taskId) {
-            window.location.href = `task_detail.php?taskID=${taskId}`;
+            window.location.href = `task_detail.php?taskID=${taskId}`; //ไปยังหน้ารายละเอียดงาน
         }
 
         function updateBadges() {
