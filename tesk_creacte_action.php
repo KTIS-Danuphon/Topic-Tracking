@@ -186,7 +186,7 @@ try {
                     'fd_task_id' => $taskID,
                     'fd_title' => 'สร้างงานใหม่',
                     'fd_message' => $massage_main_noti,
-                    'fd_icontype' => 'new_task',
+                    'fd_icontype' => 'task',
                     // 'fd_is_deleted ' => '0',//สถานะการลบโดยผู้ส่ง: 0=ปกติ, 1=ถอนแจ้งเตือน 	
                     // 'fd_deleted_at' => null,วันที่ลบโดยผู้สร้าง
                     'fd_created_at' => $formatted_now
@@ -195,7 +195,7 @@ try {
 
                 //เพิ่มแจ้งเตือน รายบุคคล tb_notification_users_c050968
                 $table_detail = 'tb_notification_users_c050968';
-                $massage_additional = 'คุณถูกเพิ่มในส่วนร่วมไร่วมงานใหม่ "' . $taskTitle . '" โดย ' . $_SESSION['user_fullname'] . '.'; //ผู้ที่มีส่วนร่วมแต่ไม่ถูกกล่าวถึง
+                $massage_additional = 'คุณถูกกล่าวถึงในงาน "' . $taskTitle . '" โดย ' . $_SESSION['user_fullname'] . '.'; //ผู้ที่มีส่วนร่วมแต่ไม่ถูกกล่าวถึง
                 foreach ($arr_additionalUsers as $UsersID) { //ผู้ที่มีส่วนร่วมทั้งหมด
                     $noti_user_Data = [
                         'fd_notification_id' => $main_notiID,
@@ -219,7 +219,7 @@ try {
                         'fd_task_id' => $taskID,
                         'fd_title' => 'การกล่าวถึงในงานใหม่',
                         'fd_message' => $masssage_mentioned,
-                        'fd_icontype' => 'tag_mention',
+                        'fd_icontype' => 'mention',
                         // 'fd_is_deleted ' => '0',//สถานะการลบโดยผู้ส่ง: 0=ปกติ, 1=ถอนแจ้งเตือน 	
                         // 'fd_deleted_at' => null, วันที่ลบโดยผู้สร้าง
                         'fd_created_at' => $formatted_now
