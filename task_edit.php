@@ -1,5 +1,110 @@
-<?php include 'session_check.php'; ?>
+<?php
+include 'session_check.php';
+date_default_timezone_set('Asia/Bangkok');
 
+require_once 'class/crud.class.php';
+require_once 'class/util.class.php';
+require_once 'class/encrypt.class.php';
+
+$object   = new CRUD();
+$util     = new Util();
+$Encrypt  = new Encrypt_data();
+$now = new DateTime();
+$formatted_now = $now->format('Y-m-d H:i:s');
+$TaskID = intval($Encrypt->DeCrypt_pass($_GET['taskID']));
+$TaskID_Encode = $_GET['taskID'];
+if (empty($TaskID)) {
+    header('Location: tasks.php');
+    exit();
+}
+// ดึงข้อมูลงาน
+$table = 'tb_topics_c050968';
+$fields = 'fd_topic_id, fd_topic_title, fd_topic_detail, fd_topic_category, fd_topic_mentioned, fd_topic_status, fd_topic_participant, fd_topic_created_by, fd_topic_due_date, fd_topic_importance, fd_topic_private, fd_topic_active, fd_topic_created_at ';
+$where = 'WHERE fd_topic_id = "' . $TaskID . '" ';
+$result_topic = $object->ReadData($table, $fields, $where);
+$result_participant = trim($result_topic[0]['fd_topic_participant'], '[]'); // ลบ [] ออก
+
+$table = 'tb_users_c050968 user';
+$fields = 'user.fd_user_id, user.fd_user_fullname, dept.fd_dept_name ';
+$where = 'LEFT JOIN tb_departments_c050968 dept ON dept.fd_dept_id = user.fd_user_dept ';
+switch ($_SESSION['user_status']) {
+    //admin / executive → เห็น user ทุกคน
+    case 'admin':
+    case 'executive':
+        $where .= 'WHERE user.fd_user_status = "user" AND user.fd_user_active = "1"';
+        break;
+    //user → เห็นเฉพาะคนอื่นในแผนกเดียวกัน มีสถานะเป็น user และ active
+    case 'user':
+    default:
+        $where .= 'WHERE user.fd_user_status = "user" AND user.fd_user_dept = "' . $_SESSION['user_dept'] . '" AND user.fd_user_active = "1"';
+        break;
+}
+$result_user = $object->ReadData($table, $fields, $where);
+foreach ($result_user as &$row) {
+    $fullname = $row['fd_user_fullname'];
+    $nameParts = preg_split('/\s+/', trim($fullname));
+
+    $avatar = '';
+    foreach ($nameParts as $p) {
+        $avatar .= mb_substr($p, 0, 1, 'UTF-8');
+    }
+
+    $row['avatar'] = $avatar;
+}
+unset($row); // สำคัญ ป้องกัน bug
+
+$table = 'tb_topic_files_c050968';
+$fields = 'fd_file_id, fd_file_original_name , fd_file_path, fd_file_size, fd_file_type ';
+$where = 'WHERE fd_file_task_id = "' . $TaskID . '" AND fd_file_active = "1" ';
+$result_files = $object->ReadData($table, $fields, $where);
+
+//json
+//งาน + ไฟล์เดิม
+$task = $result_topic[0];
+$existingFiles = [];
+if (is_array($result_files)) {
+    foreach ($result_files as $file) {
+        $existingFiles[] = [
+            'id'   => $file['fd_file_id'],
+            'name' => $file['fd_file_original_name'],
+            'size' => $file['fd_file_size'],
+            'type' => $file['fd_file_type'],
+            'path' => $file['fd_file_path']
+        ];
+    }
+}
+$existingTask = [
+    'id' => (int)$task['fd_topic_id'],
+    'title' => $task['fd_topic_title'],
+    'description' => $task['fd_topic_detail'],
+    'category' => $task['fd_topic_category'],
+    'status' => $task['fd_topic_status'],
+    'importance' => (int)$task['fd_topic_importance'],
+    'due_date' => $task['fd_topic_due_date'] ?? null,
+    'mentionedUsers' => $task['fd_topic_mentioned'] ? json_decode($task['fd_topic_mentioned'], true) : [],
+    'additionalUsers' => $task['fd_topic_participant'] ? json_decode($task['fd_topic_participant'], true) : [],
+];
+$existingTask['existingFiles'] = $existingFiles;
+
+// เตรียมข้อมูลผู้ใช้สำหรับ mention
+$users = [];
+foreach ($result_user as $row) {
+    $fullname = $row['fd_user_fullname'];
+    $nameParts = explode(' ', $fullname);
+
+    $avatar = '';
+    foreach ($nameParts as $p) {
+        $avatar .= mb_substr($p, 0, 1); //ตัวแรกของชื่อและสกุล
+    }
+
+    $users[] = [
+        'id'     => $row['fd_user_id'],
+        'name'   => $fullname,
+        'role'   => $row['fd_dept_name'], // ชื่อฝ่ายงาน
+        'avatar' => $avatar
+    ];
+}
+?>
 <!DOCTYPE html>
 <html lang="th">
 
@@ -745,6 +850,27 @@
             padding: 1rem;
             margin-bottom: 1rem;
         }
+
+        .user-selection-item.disabled {
+            /* padding: 0.875rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-bottom: 1px solid #e2e8f0; */
+            opacity: 0.45;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .tag-item.disabled {
+            opacity: 0.6;
+        }
+
+        .tag-item.disabled .tag-remove {
+            display: none;
+        }
     </style>
 </head>
 
@@ -792,16 +918,17 @@
 
                         <div class="col-md-4 mb-3">
                             <label class="form-label">
-                                หมวดหมู่ <span class="text-danger">*</span>
+                                หมวดหมู่ <span class="text-danger">ไม่บังคับ</span>
                             </label>
-                            <select class="form-select" id="taskCategory" required>
+                            <!-- <select class="form-select" id="taskCategory" name="taskCategory" required>
                                 <option value="">เลือกหมวดหมู่</option>
                                 <option value="development">พัฒนาระบบ</option>
                                 <option value="design">ออกแบบ</option>
                                 <option value="marketing">การตลาด</option>
                                 <option value="meeting">ประชุม</option>
                                 <option value="other">อื่นๆ</option>
-                            </select>
+                            </select> -->
+                            <input type="text" class="form-control" id="taskCategory" name="taskCategory" placeholder="ระบุชื่อหมวดหมู่">
                         </div>
                     </div>
 
@@ -821,11 +948,11 @@
                     </div>
 
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">
                                 สถานะ <span class="text-danger">*</span>
                             </label>
-                            <select class="form-select" id="taskStatus" required>
+                            <select class="form-select" id="taskStatus" name="taskStatus" required>
                                 <option value="">เลือกสถานะ</option>
                                 <option value="pending">รอดำเนินการ</option>
                                 <option value="in-progress">กำลังดำเนินการ</option>
@@ -833,7 +960,17 @@
                             </select>
                         </div>
 
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">
+                                วันที่ครบกำหนด(ไม่บังคับ)
+                            </label>
+                            <input type="date" class="form-control" id="taskDueDate" name="taskDueDate">
+                            <small class="text-muted d-block mt-2">
+                                ไม่มีวันครบกำหนดถ้าปล่อยว่างไว้
+                            </small>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
                             <label class="form-label">
                                 ความเร่งด่วน <span class="text-danger">*</span>
                             </label>
@@ -844,7 +981,7 @@
                                 <span class="star" data-value="4">★</span>
                                 <span class="star" data-value="5">★</span>
                             </div>
-                            <input type="hidden" id="taskImportance" value="0" required>
+                            <input type="hidden" id="taskImportance" name="taskImportance" value="0" required>
                             <small class="text-muted d-block mt-2" id="importanceLabel">
                                 กรุณาเลือกระดับความเร่งด่วน
                             </small>
@@ -931,6 +1068,10 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        const sessionUserId = <?= json_encode($_SESSION['user_id']) ?>;
+        const sessionUserStatus = <?= json_encode($_SESSION['user_status']) ?>;
+    </script>
+    <script>
         // Sidebar Toggle
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -966,62 +1107,65 @@
         });
     </script>
     <script>
-        const users = [{
-                id: 1,
-                name: 'สมชาย ใจดี',
-                role: 'Developer',
-                avatar: 'SC'
-            },
-            {
-                id: 2,
-                name: 'สมหญิง สวยงาม',
-                role: 'Designer',
-                avatar: 'SS'
-            },
-            {
-                id: 3,
-                name: 'วิชัย รักงาน',
-                role: 'Project Manager',
-                avatar: 'WR'
-            },
-            {
-                id: 4,
-                name: 'มานี มีเงิน',
-                role: 'Marketing',
-                avatar: 'MM'
-            },
-            {
-                id: 5,
-                name: 'ประเสริฐ ดีเด่น',
-                role: 'Developer',
-                avatar: 'PD'
-            }
-        ];
+        const users = <?= json_encode($users, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT); ?>;
+        // const users = [{
+        //         id: 1,
+        //         name: 'สมชาย ใจดี',
+        //         role: 'Developer',
+        //         avatar: 'SC'
+        //     },
+        //     {
+        //         id: 2,
+        //         name: 'สมหญิง สวยงาม',
+        //         role: 'Designer',
+        //         avatar: 'SS'
+        //     },
+        //     {
+        //         id: 3,
+        //         name: 'วิชัย รักงาน',
+        //         role: 'Project Manager',
+        //         avatar: 'WR'
+        //     },
+        //     {
+        //         id: 4,
+        //         name: 'มานี มีเงิน',
+        //         role: 'Marketing',
+        //         avatar: 'MM'
+        //     },
+        //     {
+        //         id: 5,
+        //         name: 'ประเสริฐ ดีเด่น',
+        //         role: 'Developer',
+        //         avatar: 'PD'
+        //     }
+        // ];
 
         // Mock existing task data
-        const existingTask = {
-            id: 1,
-            title: "พัฒนาระบบ Login ใหม่",
-            description: "ออกแบบและพัฒนาระบบ Login ที่รองรับ OAuth 2.0\n\nต้องทำให้รองรับ:\n- Google Login\n- Facebook Login\n- Email/Password\n\n@สมชาย ใจดี @สมหญิง สวยงาม",
-            category: "development",
-            status: "in-progress",
-            importance: 5,
-            existingFiles: [{
-                    id: 1,
-                    name: 'login-mockup.pdf',
-                    size: 1024000,
-                    type: 'application/pdf'
-                },
-                {
-                    id: 2,
-                    name: 'design-spec.docx',
-                    size: 512000,
-                    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                }
-            ],
-            mentionedUsers: [1, 2],
-            additionalUsers: [3]
-        };
+        const existingTask = <?= json_encode($existingTask, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT); ?>;
+        console.log(existingTask);
+        // const existingTask = {
+        //     id: 1,
+        //     title: "พัฒนาระบบ Login ใหม่",
+        //     description: "ออกแบบและพัฒนาระบบ Login ที่รองรับ OAuth 2.0\n\nต้องทำให้รองรับ:\n- Google Login\n- Facebook Login\n- Email/Password\n\n@สมชาย ใจดี @สมหญิง สวยงาม",
+        //     category: "development",
+        //     status: "in-progress",
+        //     importance: 5,
+        //     existingFiles: [{
+        //             id: 1,
+        //             name: 'login-mockup.pdf',
+        //             size: 1024000,
+        //             type: 'application/pdf'
+        //         },
+        //         {
+        //             id: 2,
+        //             name: 'design-spec.docx',
+        //             size: 512000,
+        //             type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        //         }
+        //     ],
+        //     mentionedUsers: [1, 2],
+        //     additionalUsers: [3]
+        // };
 
         let mentionedUsers = [];
         let newFiles = [];
@@ -1042,6 +1186,7 @@
             document.getElementById('taskCategory').value = existingTask.category;
             document.getElementById('taskDescription').value = existingTask.description;
             document.getElementById('taskStatus').value = existingTask.status;
+            document.getElementById('taskDueDate').value = existingTask.due_date;
             document.getElementById('taskImportance').value = existingTask.importance;
             updateStars(existingTask.importance);
 
@@ -1074,7 +1219,7 @@
             }
 
             // Update breadcrumb link
-            document.getElementById('taskDetailLink').href = `task_detail.php?taskID=abc123`;
+            document.getElementById('taskDetailLink').href = `task_detail.php?taskID=<?= $TaskID_Encode ?>`;
         }
 
         function displayExistingFiles() {
@@ -1238,30 +1383,60 @@
         }
 
         function renderUserList(userList) {
+
+            const isPrivileged =
+                sessionUserStatus === 'admin' ||
+                sessionUserStatus === 'executive';
+
             const container = document.getElementById('userSelectionList');
 
-            if (userList.length === 0) {
-                container.innerHTML = '<div class="no-results"><i class="bi bi-search"></i><p class="mt-2">ไม่พบผู้ใช้</p></div>';
-                return;
-            }
+            container.innerHTML = userList.map(user => {
+                const isSelf = user.id === sessionUserId;
+                const disabled = !isPrivileged && !isSelf;
 
-            container.innerHTML = userList.map(user => `
-            <div class="user-selection-item ${additionalSelectedUsers.includes(user.id) ? 'selected' : ''}" 
-                 onclick="toggleUserSelection(${user.id})">
-                <input type="checkbox" class="user-checkbox" 
-                       ${additionalSelectedUsers.includes(user.id) ? 'checked' : ''}
-                       onclick="event.stopPropagation(); toggleUserSelection(${user.id})">
-                <div class="user-selection-avatar">${user.avatar}</div>
-                <div class="user-selection-info">
-                    <div class="user-selection-name">${user.name}</div>
-                    <div class="user-selection-role">${user.role}</div>
-                </div>
-            </div>
-        `).join('');
+                return `
+                <div class="user-selection-item ${disabled ? 'disabled' : ''}"
+                     ${!disabled ? `onclick="toggleUserSelection(${user.id})"` : ''}>
+
+                    <input type="checkbox"
+                           class="user-checkbox"
+                           ${additionalSelectedUsers.includes(user.id) ? 'checked' : ''}
+                           ${disabled ? 'disabled' : ''}
+                           onclick="event.stopPropagation(); toggleUserSelection(${user.id})">
+                    <div class="user-selection-avatar">${user.avatar}</div>
+
+                    <div class="user-selection-info">
+                        <div class="user-selection-name">
+                            ${user.name}
+                            ${disabled ? '<small class="text-muted">(เลือกไม่ได้)</small>' : ''}
+                        </div>
+                        <div class="user-selection-role">${user.role}</div>
+                    </div>
+                </div>`;
+            }).join('');
         }
 
         function toggleUserSelection(userId) {
+
+            const isPrivileged =
+                sessionUserStatus === 'admin' ||
+                sessionUserStatus === 'executive';
+
+            // 🔒 user ทั่วไป เลือกได้เฉพาะตัวเอง
+            if (!isPrivileged && userId !== sessionUserId) {
+                return;
+            }
+
             const index = additionalSelectedUsers.indexOf(userId);
+
+            // ⚠️ กำลังจะเอาตัวเองออก
+            if (userId === sessionUserId && index > -1) {
+                const confirmed = confirm(
+                    'หากคุณนำตัวเองออกจากผู้เกี่ยวข้อง คุณจะไม่สามารถเห็นงานนี้ได้อีก\n\nต้องการดำเนินการต่อหรือไม่?'
+                );
+
+                if (!confirmed) return;
+            }
 
             if (index > -1) {
                 additionalSelectedUsers.splice(index, 1);
@@ -1281,14 +1456,31 @@
                 return;
             }
 
-            const selectedUserObjects = users.filter(u => additionalSelectedUsers.includes(u.id));
+            const isPrivileged =
+                sessionUserStatus === 'admin' ||
+                sessionUserStatus === 'executive';
 
-            container.innerHTML = selectedUserObjects.map(user => `
-            <div class="tag-item">
-                <span>${user.name}</span>
-                <span class="tag-remove" onclick="toggleUserSelection(${user.id})">×</span>
-            </div>
-        `).join('');
+            const selectedUserObjects = users.filter(u =>
+                additionalSelectedUsers.includes(u.id)
+            );
+
+            container.innerHTML = selectedUserObjects.map(user => {
+                const canRemove = isPrivileged || user.id === sessionUserId;
+
+                return `
+                <div class="tag-item ${!canRemove ? 'disabled' : ''}">
+                    <span>${user.name}</span>
+                    ${canRemove ? `
+                        <span class="tag-remove"
+                              onclick="toggleUserSelection(${user.id})">×</span>
+                    ` : `
+                        <span class="text-muted small ms-1">(ลบไม่ได้)</span>
+                    `}
+                </div>
+                `;
+            }).join('');
+
+
         }
 
         document.getElementById('userSearchInput').addEventListener('input', function() {
