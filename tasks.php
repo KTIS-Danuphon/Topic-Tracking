@@ -65,6 +65,290 @@ foreach ($result_topic as $row) {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
     <?php include 'style_menu.php'; ?>
+    <style>
+        /* View Toggle Buttons */
+        .view-toggle {
+            display: flex;
+            gap: 0.5rem;
+            background: white;
+            padding: 0.25rem;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .view-toggle-btn {
+            padding: 0.5rem 1rem;
+            border: none;
+            background: transparent;
+            color: #64748b;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .view-toggle-btn:hover {
+            background: #f1f5f9;
+            color: #667eea;
+        }
+
+        .view-toggle-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        /* Card View Styles */
+        .cards-container {
+            display: none;
+            gap: 1.5rem;
+        }
+
+        .cards-container.active {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        }
+
+        .task-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 1px solid #e2e8f0;
+        }
+
+        .task-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        .card-header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .card-task-id {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .card-priority {
+            color: #fbbf24;
+            font-size: 0.9rem;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .card-description {
+            font-size: 0.9rem;
+            color: #64748b;
+            margin-bottom: 1rem;
+            line-height: 1.6;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            padding-top: 1rem;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .card-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+
+        .card-meta-item i {
+            font-size: 1rem;
+        }
+
+        /* Table View Styles */
+        .table-view {
+            display: none;
+        }
+
+        .table-view.active {
+            display: block;
+        }
+
+        .task-table-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        .task-table {
+            margin-bottom: 0;
+        }
+
+        .task-table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .task-table thead th {
+            border: none;
+            padding: 1rem;
+            font-weight: 600;
+            white-space: nowrap;
+            font-size: 0.9rem;
+        }
+
+        .task-table tbody tr {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .task-table tbody tr:hover {
+            background-color: #f8f9fa;
+            transform: scale(1.002);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .task-table tbody td {
+            padding: 1rem;
+            vertical-align: middle;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .task-id {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 0.85rem;
+        }
+
+        .task-title-cell {
+            max-width: 250px;
+        }
+
+        .task-title-text {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 0.25rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .task-description-preview {
+            font-size: 0.85rem;
+            color: #718096;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-badge.pending {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-badge.in-progress {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-badge.completed {
+            background-color: #d1fae5;
+            color: #065f46;
+        }
+
+        .category-badge {
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background-color: #e0e7ff;
+            color: #4338ca;
+            display: inline-block;
+        }
+
+        .priority-stars {
+            color: #fbbf24;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .date-text {
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #94a3b8;
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Pagination */
+        .pagination-container {
+            padding: 1.5rem;
+            background: white;
+            border-radius: 12px;
+            margin-top: 1rem;
+        }
+
+        .table-info {
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .cards-container.active {
+                grid-template-columns: 1fr;
+            }
+
+            .task-table-container {
+                overflow-x: auto;
+            }
+
+            .task-table {
+                min-width: 800px;
+            }
+        }
+    </style>
 </head>
 
 <body>
@@ -89,6 +373,18 @@ foreach ($result_topic as $row) {
                 </div>
                 <div class="col-md-8">
                     <div class="d-flex flex-wrap gap-2 justify-content-md-end">
+                        <!-- View Toggle -->
+                        <div class="view-toggle">
+                            <button class="view-toggle-btn active" onclick="switchView('table')" id="tableViewBtn">
+                                <i class="bi bi-table"></i>
+                                <span class="d-none d-sm-inline">ตาราง</span>
+                            </button>
+                            <button class="view-toggle-btn" onclick="switchView('card')" id="cardViewBtn">
+                                <i class="bi bi-grid-3x3-gap"></i>
+                                <span class="d-none d-sm-inline">การ์ด</span>
+                            </button>
+                        </div>
+
                         <div class="dropdown">
                             <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-funnel me-1"></i> กรองข้อมูล
@@ -100,6 +396,7 @@ foreach ($result_topic as $row) {
                                 <li><a class="dropdown-item" href="#" onclick="filterTasks('month')">เดือนนี้</a></li>
                             </ul>
                         </div>
+
                         <div class="dropdown">
                             <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-sort-down me-1"></i> เรียงตาม
@@ -117,30 +414,30 @@ foreach ($result_topic as $row) {
                 </div>
             </div>
 
-            <!-- Table -->
-            <div class="task-table-container">
-                <table class="table task-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 8%;">รหัสงาน</th>
-                            <th style="width: 32%;">ชื่องาน</th>
-                            <th style="width: 14%;">หมวดหมู่</th>
-                            <th style="width: 16%;">สถานะ</th>
-                            <th style="width: 10%;">ความเร่งด่วน</th>
-                            <th style="width: 20%;">วันที่สร้าง</th>
-                            <!-- <th style="width: 10%;">รหัสงาน</th>
-                            <th style="width: 30%;">ชื่องาน</th>
-                            <th style="width: 12%;">หมวดหมู่</th>
-                            <th style="width: 13%;">สถานะ</th>
-                            <th style="width: 12%;">ความเร่งด่วน</th>
-                            <th style="width: 13%;">วันที่สร้าง</th>
-                            <th style="width: 10%;" class="text-center">จัดการ</th> -->
-                        </tr>
-                    </thead>
-                    <tbody id="taskTableBody">
-                        <!-- Tasks will be loaded here -->
-                    </tbody>
-                </table>
+            <!-- Table View -->
+            <div class="table-view active" id="tableView">
+                <div class="task-table-container">
+                    <table class="table task-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 8%;">รหัสงาน</th>
+                                <th style="width: 32%;">ชื่องาน</th>
+                                <th style="width: 14%;">หมวดหมู่</th>
+                                <th style="width: 16%;">สถานะ</th>
+                                <th style="width: 10%;">ความเร่งด่วน</th>
+                                <th style="width: 20%;">วันที่สร้าง</th>
+                            </tr>
+                        </thead>
+                        <tbody id="taskTableBody">
+                            <!-- Tasks will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Card View -->
+            <div class="cards-container" id="cardView">
+                <!-- Cards will be loaded here -->
             </div>
 
             <!-- Pagination -->
@@ -180,42 +477,7 @@ foreach ($result_topic as $row) {
         let filteredTasks = [...mockTasks];
         let currentPage = 1;
         let itemsPerPage = 10;
-
-        // Sidebar Toggle
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebarOverlay');
-            sidebar.classList.toggle('show');
-            overlay.classList.toggle('show');
-        }
-
-        // Notifications
-        function showNotifications() {
-            alert('แจ้งเตือนทั้งหมด:\n\n- งานใหม่ถูกมอบหมายให้คุณ\n- มีความคิดเห็นใหม่ในงาน\n- งานใกล้ครบกำหนด 3 งาน');
-        }
-
-        // User Menu
-        function toggleUserMenu() {
-            alert('เมนูผู้ใช้:\n- โปรไฟล์\n- ตั้งค่า\n- ออกจากระบบ');
-        }
-
-        // Logout
-        function logout() {
-            if (confirm('คุณต้องการออกจากระบบหรือไม่?')) {
-                window.location.href = 'logout.php';
-            }
-        }
-
-        function getCategoryName(category) {
-            const categories = {
-                'development': 'พัฒนาระบบ',
-                'design': 'ออกแบบ',
-                'marketing': 'การตลาด',
-                'meeting': 'ประชุม',
-                'other': 'อื่นๆ'
-            };
-            return categories[category] || 'อื่นๆ';
-        }
+        let currentView = '<?= !empty($_SESSION['style_show']) ? $_SESSION['style_show'] : 'table' ?>'; // 'table' or 'card'
 
         function getStatusName(status) {
             const statuses = {
@@ -250,16 +512,32 @@ foreach ($result_topic as $row) {
             return stars;
         }
 
-        function renderTasks() {
+        function switchView(view) {
+            currentView = view;
+            if (view === 'table') {
+                <?php $_SESSION['style_show'] = 'table'; ?>
+            } else {
+                <?php $_SESSION['style_show'] = 'card'; ?>
+            }
+
+            // Update buttons
+            document.getElementById('tableViewBtn').classList.toggle('active', view === 'table');
+            document.getElementById('cardViewBtn').classList.toggle('active', view === 'card');
+
+            // Update views
+            document.getElementById('tableView').classList.toggle('active', view === 'table');
+            document.getElementById('cardView').classList.toggle('active', view === 'card');
+
+            renderTasks();
+        }
+
+        function renderTableView(tasksToShow) {
             const tbody = document.getElementById('taskTableBody');
-            const start = (currentPage - 1) * itemsPerPage;
-            const end = start + itemsPerPage;
-            const tasksToShow = filteredTasks.slice(start, end);
 
             if (tasksToShow.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="empty-state">
+                        <td colspan="6" class="empty-state">
                             <i class="bi bi-inbox"></i>
                             <h5 class="mt-3">ไม่พบงานที่ค้นหา</h5>
                             <p>ลองเปลี่ยนคำค้นหาหรือกรองข้อมูลใหม่</p>
@@ -268,37 +546,7 @@ foreach ($result_topic as $row) {
                 `;
                 return;
             }
-            //ตัวอย่างสถานะงาน
-            // <!-- รอดำเนินการ -->
-            // <span class="status-badge pending">
-            //     <i class="bi bi-clock"></i>
-            //     รอดำเนินการ
-            // </span>
 
-            // <!-- กำลังดำเนินการ -->
-            // <span class="status-badge in-progress">
-            //     <i class="bi bi-arrow-repeat"></i>
-            //     กำลังดำเนินการ
-            // </span>
-
-            // <!-- เสร็จสิ้น -->
-            // <span class="status-badge completed">
-            //     <i class="bi bi-check-circle-fill"></i>
-            //     เสร็จสิ้น
-            // </span>
-
-            // <!-- เลยกำหนด -->
-            // <span class="status-badge overdue">
-            //     <i class="bi bi-exclamation-circle-fill"></i>
-            //     เลยกำหนด 2 วัน
-            // </span>
-
-            // <!-- เลยกำหนดมาก -->
-            // <span class="status-badge overdue-critical">
-            //     <i class="bi bi-exclamation-triangle-fill"></i>
-            //     เลยกำหนด 5 วัน
-            // </span>
-            const showAction = false;
             tbody.innerHTML = tasksToShow.map(task => `
                 <tr onclick="viewTask('${task.encrypt_id}')">
                     <td>
@@ -320,7 +568,6 @@ foreach ($result_topic as $row) {
                             ${getStatusName(task.status)}
                         </span>
                     </td>
-                    
                     <td>
                         <div class="priority-stars" title="${task.importance} ดาว">
                             ${generateStars(task.importance)}
@@ -331,18 +578,67 @@ foreach ($result_topic as $row) {
                             <i class="bi bi-calendar3 me-1"></i>${formatDate(task.created_at)}
                         </div>
                     </td>
-                    ${showAction ? `
-                    <td class="text-center">
-                        <div class="action-buttons justify-content-center">
-                            <button class="btn btn-sm btn-outline-primary btn-action"
-                                    onclick="event.stopPropagation(); viewTask('${task.encrypt_id}')">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                        </div>
-                    </td>
-                    ` : ''}
                 </tr>
             `).join('');
+        }
+
+        function renderCardView(tasksToShow) {
+            const cardContainer = document.getElementById('cardView');
+
+            if (tasksToShow.length === 0) {
+                cardContainer.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1/-1;">
+                        <i class="bi bi-inbox"></i>
+                        <h5 class="mt-3">ไม่พบงานที่ค้นหา</h5>
+                        <p>ลองเปลี่ยนคำค้นหาหรือกรองข้อมูลใหม่</p>
+                    </div>
+                `;
+                return;
+            }
+
+            cardContainer.innerHTML = tasksToShow.map(task => `
+                <div class="task-card" onclick="viewTask('${task.encrypt_id}')">
+                    <div class="card-header-section">
+                        <div class="card-task-id">
+                            <i class="bi bi-hash"></i>Task-${task.id.toString().padStart(4, '0')}
+                        </div>
+                        <div class="card-priority" title="${task.importance} ดาว">
+                            ${generateStars(task.importance)}
+                        </div>
+                    </div>
+                    
+                    <div class="card-title">${task.title}</div>
+                    <div class="card-description">${task.description}</div>
+                    
+                    <div class="card-meta">
+                        <div class="card-meta-item">
+                            <i class="bi bi-tag"></i>
+                            ${task.category}
+                        </div>
+                        <div class="card-meta-item">
+                            <span class="status-badge ${task.status}">
+                                ${getStatusName(task.status)}
+                            </span>
+                        </div>
+                        <div class="card-meta-item">
+                            <i class="bi bi-calendar3"></i>
+                            ${formatDate(task.created_at)}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderTasks() {
+            const start = (currentPage - 1) * itemsPerPage;
+            const end = start + itemsPerPage;
+            const tasksToShow = filteredTasks.slice(start, end);
+
+            if (currentView === 'table') {
+                renderTableView(tasksToShow);
+            } else {
+                renderCardView(tasksToShow);
+            }
 
             updatePaginationInfo();
             renderPagination();
@@ -409,7 +705,6 @@ foreach ($result_topic as $row) {
         }
 
         function filterTasks(filter) {
-            // Update active dropdown item
             document.querySelectorAll('.dropdown-menu a').forEach(item => {
                 item.classList.remove('active');
             });
@@ -464,8 +759,6 @@ foreach ($result_topic as $row) {
                         return new Date(a.created_at) - new Date(b.created_at);
                     case 'title':
                         return a.title.localeCompare(b.title, 'th');
-                    case 'priority':
-                        return b.importance - a.importance;
                     default:
                         return 0;
                 }
@@ -486,8 +779,7 @@ foreach ($result_topic as $row) {
                 task.title.toLowerCase().includes(query) ||
                 task.description.toLowerCase().includes(query) ||
                 task.id.toString().includes(query) ||
-                getCategoryName(task.category).toLowerCase().includes(query) ||
-                getStatusName(task.status).toLowerCase().includes(query)
+                task.category.toLowerCase().includes(query)
             );
             currentPage = 1;
             renderTasks();
@@ -499,6 +791,14 @@ foreach ($result_topic as $row) {
             currentPage = 1;
             renderTasks();
         });
+
+        // Sidebar Toggle
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.toggle('show');
+            overlay.classList.toggle('show');
+        }
 
         // Close sidebar when clicking on menu item (mobile)
         document.querySelectorAll('.menu-link').forEach(link => {
@@ -520,6 +820,9 @@ foreach ($result_topic as $row) {
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             renderTasks();
+            const currentView = '<?= !empty($_SESSION['style_show']) ? $_SESSION['style_show'] : 'table' ?>';
+            switchView(currentView);
+
         });
     </script>
 </body>
