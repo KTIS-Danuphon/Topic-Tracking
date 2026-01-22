@@ -11,15 +11,16 @@ $util     = new Util();
 $Encrypt  = new Encrypt_data();
 $now = new DateTime();
 $formatted_now = $now->format('Y-m-d H:i:s');
-$TaskID = $Encrypt->DeCrypt_pass($_GET['taskID']);
+$TaskID = intval($Encrypt->DeCrypt_pass($_GET['taskID']));
+$TaskID_Encode = $_GET['taskID'];
 if (empty($TaskID)) {
     header('Location: tasks.php');
     exit();
 }
 // ดึงข้อมูลงาน
 $table = 'tb_topics_c050968';
-$fields = 'fd_topic_id, fd_topic_title, fd_topic_detail, fd_topic_category, fd_topic_mentioned, fd_topic_status, fd_topic_participant, fd_topic_created_by, fd_topic_importance, fd_topic_private, fd_topic_active, fd_topic_created_at ';
-$where = 'WHERE fd_topic_id = "' . $Encrypt->DeCrypt_pass($_GET['taskID']) . '" ';
+$fields = 'fd_topic_id, fd_topic_title, fd_topic_detail, fd_topic_category, fd_topic_mentioned, fd_topic_status, fd_topic_participant, fd_topic_created_by, fd_topic_due_date, fd_topic_importance, fd_topic_private, fd_topic_active, fd_topic_created_at ';
+$where = 'WHERE fd_topic_id = "' . $TaskID . '" ';
 $result_topic = $object->ReadData($table, $fields, $where);
 $result_participant = trim($result_topic[0]['fd_topic_participant'], '[]'); // ลบ [] ออก
 
@@ -43,12 +44,12 @@ unset($row); // สำคัญ ป้องกัน bug
 
 $table = 'tb_topic_files_c050968';
 $fields = 'fd_file_id, fd_file_original_name , fd_file_path, fd_file_size, fd_file_type ';
-$where = 'WHERE fd_file_task_id = "' . $Encrypt->DeCrypt_pass($_GET['taskID']) . '" AND fd_file_active = "1" ';
+$where = 'WHERE fd_file_task_id = "' . $TaskID . '" AND fd_file_active = "1" ';
 $result_files = $object->ReadData($table, $fields, $where);
 
 $table = 'tb_topic_log_c050968';
 $fields = 'fd_topic_log_id, fd_topic_log_type, fd_topic_log_text, fd_topic_log_time ';
-$where = 'WHERE fd_topic_id = "' . $Encrypt->DeCrypt_pass($_GET['taskID']) . '" ORDER BY fd_topic_log_id DESC';
+$where = 'WHERE fd_topic_id = "' . $TaskID . '" ORDER BY fd_topic_log_id DESC';
 $result_log = $object->ReadData($table, $fields, $where);
 
 
@@ -65,7 +66,18 @@ $taskData = [
 ];
 
 $taskData['team'] = $result_user; // ดึงผู้เกี่ยวข้องจากฐานข้อมูลถ้ามี
-$taskData['files'] = $result_files; // ดึงไฟล์จากฐานข้อมูลถ้ามี
+ // ดึงไฟล์จากฐานข้อมูลถ้ามี
+if (is_array($result_files)) {
+    foreach ($result_files as &$file) {
+        if (isset($file['fd_file_id'])) {
+            $file['fd_file_id'] = $Encrypt->EnCrypt_pass($file['fd_file_id']);
+        }
+    }
+    unset($file); // ป้องกัน reference bug
+}
+
+$taskData['files'] = $result_files;
+
 $taskData['allComments'] = []; // ดึงความคิดเห็นจากฐานข้อมูลถ้ามี
 
 $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจากฐานข้อมูลถ้ามี
@@ -84,6 +96,8 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
     <link rel="icon" href="ktis.svg" type="image/svg+xml">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <?php include 'style_menu.php'; ?>
 
     <style>
@@ -643,7 +657,7 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
                             การจัดการ
                         </div>
                         <div class="action-buttons flex-column">
-                            <a href="task_edit.php" class="btn btn-action btn-edit">
+                            <a href="task_edit.php?taskID=<?= $TaskID_Encode ?>" class="btn btn-action btn-edit">
                                 <!-- <button type="button" class="btn btn-action btn-edit"> -->
                                 <i class="bi bi-pencil me-2"></i>
                                 แก้ไขงาน
@@ -653,7 +667,7 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
                                 <i class="bi bi-check-circle me-2"></i>
                                 เสร็จสิ้น
                             </button> -->
-                            <button class="btn btn-action btn-delete">
+                            <button class="btn btn-action btn-delete" onclick="confirmDeleteTask()">
                                 <i class="bi bi-trash me-2"></i>
                                 ลบงาน
                             </button>
@@ -1008,7 +1022,7 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
                 teamHtml = taskData.team.map(member => `
                     <div class="user-card">
                         <div class="user-avatar">${member.avatar}</div>
-                        <div class="user-info">
+                        <div class="user-selection-item">
                             <div class="user-name">${member.fd_user_fullname}</div>
                             <div class="user-role">${member.fd_dept_name}</div>
                         </div>
@@ -1033,7 +1047,7 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
                             <div class="file-name">${file.fd_file_original_name}</div>
                             <div class="file-meta">${formatFileSize(file.fd_file_size)}</div>
                         </div>
-                        <button class="btn-download" onclick="downloadFile(${file.fd_file_id})">
+                        <button class="btn-download" onclick="downloadFile('${file.fd_file_id}')">
                             <i class="bi bi-download"></i>
                         </button>
                     </div>
@@ -1205,17 +1219,29 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
         }
 
         function formatDate(dateString) {
-            if (dateString === null) return '-';
+            if (!dateString) return '-';
+
+            const hasTime = /[T\s]\d{2}:\d{2}/.test(dateString);
             const date = new Date(dateString);
-            const options = {
+
+            const dateOptions = {
                 year: 'numeric',
                 month: 'short',
-                day: 'numeric',
+                day: 'numeric'
+            };
+
+            const dateTimeOptions = {
+                ...dateOptions,
                 hour: '2-digit',
                 minute: '2-digit'
             };
-            return date.toLocaleDateString('th-TH', options);
+
+            return date.toLocaleDateString(
+                'th-TH',
+                hasTime ? dateTimeOptions : dateOptions
+            );
         }
+
 
         function formatFileSize(bytes) {
             if (bytes === 0) return '0 Bytes';
@@ -1239,10 +1265,49 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
                 'created': 'plus-circle',
                 'status': 'arrow-repeat',
                 'comment': 'chat-dots',
-                'file': 'paperclip'
+                'file': 'paperclip',
+                'delete-task': 'trash-fill'
             };
             return icons[type] || 'circle';
         }
+
+        function deleteTask() {
+            window.location.href = `task_delete.php?taskID=<?= $TaskID_Encode ?>`;
+        }
+
+        function confirmDeleteTask() {
+            Swal.fire({
+                title: 'ยืนยันการลบงาน',
+                html: `
+            <p class="mb-2">
+                การลบงานจะไม่สามารถกู้คืนได้
+            </p>
+            <p class="mb-2 text-danger">
+                หากต้องการลบ กรุณาพิมพ์คำว่า <b>delete</b>
+            </p>
+        `,
+                input: 'text',
+                inputPlaceholder: 'พิมพ์คำว่า delete',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'ลบงาน',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#dc3545',
+                cancelButtonColor: '#6c757d',
+                preConfirm: (value) => {
+                    if (value !== 'delete') {
+                        Swal.showValidationMessage('กรุณาพิมพ์คำว่า delete ให้ถูกต้อง');
+                        return false;
+                    }
+                    return true;
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    deleteTask();
+                }
+            });
+        }
+
 
         // Load task detail on page load
         document.addEventListener('DOMContentLoaded', function() {
