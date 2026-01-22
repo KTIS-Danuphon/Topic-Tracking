@@ -28,6 +28,9 @@ function Task_log($taskID, $type, $name_create = null, $object, $formatted_now)
         case 'file':
             $text_log = "จัดการไฟล์ไฟล์โดย " . $name_create;
             break;
+        case 'delete-task':
+            $text_log = "ลบงานโดย " . $name_create;
+            break;
         default:
             return;
     }
