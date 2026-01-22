@@ -872,6 +872,36 @@ foreach ($result_user as $row) {
             display: none;
         }
     </style>
+    <!-- รอลบ⬇️ -->
+    <style>
+        /* เพิ่มหลัง .btn-remove-file:hover */
+
+        .file-item.pending-delete {
+            opacity: 0.6;
+            background: #fef2f2;
+            border-color: #fecaca;
+        }
+
+        .file-badge.pending {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .btn-undo-delete {
+            background: transparent;
+            border: none;
+            color: #10b981;
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .btn-undo-delete:hover {
+            background: #d1fae5;
+        }
+    </style>
 </head>
 
 <body>
@@ -1225,10 +1255,10 @@ foreach ($result_user as $row) {
         function displayExistingFiles() {
             const container = document.getElementById('existingFilesList');
             container.innerHTML = existingTask.existingFiles.map(file => {
-                if (existingFilesToDelete.includes(file.id)) return '';
+                const isPendingDelete = existingFilesToDelete.includes(file.id);
 
                 return `
-                    <div class="file-item" data-file-id="${file.id}">
+                    <div class="file-item ${isPendingDelete ? 'pending-delete' : ''}" data-file-id="${file.id}">
                         <div class="file-icon">
                             <i class="bi bi-${getFileIcon(file.type)}"></i>
                         </div>
@@ -1236,18 +1266,31 @@ foreach ($result_user as $row) {
                             <div class="file-name" title="${file.name}">${file.name}</div>
                             <div class="file-size">${formatFileSize(file.size)}</div>
                         </div>
-                        <span class="file-badge existing">ไฟล์เดิม</span>
-                        <button type="button" class="btn-remove-file" onclick="removeExistingFile(${file.id})">
-                            <i class="bi bi-trash"></i>
-                        </button>
+                        ${isPendingDelete ? `
+                            <span class="file-badge pending">กำลังรอลบ</span>
+                            <button type="button" class="btn-undo-delete" onclick="undoDeleteFile(${file.id})" title="ยกเลิกการลบ">
+                                <i class="bi bi-arrow-counterclockwise"></i>
+                            </button>
+                        ` : `
+                            <span class="file-badge existing">ไฟล์เดิม</span>
+                            <button type="button" class="btn-remove-file" onclick="removeExistingFile(${file.id})" title="ลบไฟล์">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        `}
                     </div>
                 `;
             }).join('');
         }
 
         function removeExistingFile(fileId) {
-            if (confirm('คุณต้องการลบไฟล์นี้หรือไม่?')) {
-                existingFilesToDelete.push(fileId);
+            existingFilesToDelete.push(fileId);
+            displayExistingFiles();
+        }
+
+        function undoDeleteFile(fileId) {
+            const index = existingFilesToDelete.indexOf(fileId);
+            if (index > -1) {
+                existingFilesToDelete.splice(index, 1);
                 displayExistingFiles();
             }
         }
