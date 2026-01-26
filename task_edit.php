@@ -112,8 +112,10 @@ foreach ($result_user as $row) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>แก้ไขงาน - Topic Tracking</title>
+    <link rel="icon" href="ktis.svg" type="image/svg+xml">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         :root {
             --sidebar-width: 260px;
@@ -925,12 +927,8 @@ foreach ($result_user as $row) {
                 <p class="text-muted">แก้ไขข้อมูลงานของคุณ</p>
             </div>
 
-            <div class="alert-info">
-                <i class="bi bi-info-circle me-2"></i>
-                <strong>หมายเหตุ:</strong> ไฟล์เดิมจะถูกเก็บไว้ คุณสามารถเพิ่มไฟล์ใหม่หรือลบไฟล์เดิมได้
-            </div>
-
-            <form id="editTaskForm">
+            <form id="editTaskForm" action="task_edit_action.php" method="post" enctype="multipart/form-data">
+                <input type="hidden" id="taskID" name="taskID" value="<?= $TaskID ?>">
                 <div class="form-card">
                     <div class="form-section-title">
                         <i class="bi bi-info-circle"></i>
@@ -942,7 +940,7 @@ foreach ($result_user as $row) {
                             <label class="form-label">
                                 ชื่อหัวข้องาน <span class="text-danger">*</span>
                             </label>
-                            <input type="text" class="form-control" id="taskTitle"
+                            <input type="text" class="form-control" id="taskTitle" name="taskTitle"
                                 placeholder="ระบุชื่อหัวข้องาน..." required>
                         </div>
 
@@ -967,13 +965,13 @@ foreach ($result_user as $row) {
                             รายละเอียด <span class="text-danger">*</span>
                         </label>
                         <div class="mention-textarea-wrapper">
-                            <textarea class="form-control" id="taskDescription" rows="6"
-                                placeholder="พิมพ์ @ เพื่อแท็กผู้ใช้งาน..." required></textarea>
+                            <textarea class="form-control" id="taskDescription" name="taskDescription" rows="6"
+                                placeholder="พิมพ์ @ เพื่อแท็กผู้ใช้งาน... (เช่น @สมชาย)" required></textarea>
                             <div class="mention-dropdown" id="mentionDropdown"></div>
                         </div>
                         <small class="text-muted">
                             <i class="bi bi-info-circle me-1"></i>
-                            พิมพ์ @ ตามด้วยชื่อเพื่อแท็กผู้ใช้งาน
+                            พิมพ์ @ ตามด้วยชื่อเพื่อแท็กผู้ใช้งาน หรือพิมพ์ @all เพื่อแท็กทุกคน (เลือกได้อย่างใดอย่างหนึ่ง)
                         </small>
                     </div>
 
@@ -1026,18 +1024,33 @@ foreach ($result_user as $row) {
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">ผู้ที่ถูกแท็กในคำอธิบาย</label>
+                        <label class="form-label">ผู้ที่ถูกแท็กในคำอธิบาย <span id="mentionedList"></span></label>
                         <div class="tags-container" id="mentionedUsersContainer">
                             <small class="text-muted">ยังไม่มีผู้ใช้ที่ถูกแท็ก</small>
                         </div>
+                        <input type="hidden" id="mentionedUsersInput" name="mentionedUsers">
+                        <small class="text-muted d-block mt-2">
+                            <i class="bi bi-lightbulb me-1"></i>
+                            หมายเหตุ: สามารถเลือกแท็กแบบ <strong>รายบุคคล</strong> หรือ <strong>@all ทุกคน</strong> เท่านั้น (เลือกได้อย่างใดอย่างหนึ่ง)
+                        </small>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">เพิ่มผู้เกี่ยวข้องเพิ่มเติม (ไม่บังคับ)</label>
+                        <label class="form-label">เพิ่มผู้เกี่ยวข้องเพิ่มเติม <code>*ผู้ไม่เกี่ยวข้องจะไม่สามารถมองเห็นงานนี้ได้ (ยกเว้น แอดมินและผู้บริหาร)</code></label>
 
                         <div class="mb-2">
                             <input type="text" class="form-control" id="userSearchInput"
                                 placeholder="🔍 พิมพ์ชื่อเพื่อค้นหาผู้ใช้...">
+                        </div>
+
+                        <!-- เพิ่มปุ่มเลือกทั้งหมด -->
+                        <div class="mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="selectAllUsers" onchange="toggleSelectAll()">
+                                <label class="form-check-label" for="selectAllUsers">
+                                    <strong>เลือกทั้งหมด</strong>
+                                </label>
+                            </div>
                         </div>
 
                         <div class="user-selection-list" id="userSelectionList"></div>
@@ -1047,6 +1060,7 @@ foreach ($result_user as $row) {
                             <div class="tags-container" id="additionalUsersContainer">
                                 <small class="text-muted">ยังไม่ได้เลือกผู้ใช้เพิ่มเติม</small>
                             </div>
+                            <input type="hidden" id="additionalUsersInput" name="additionalUsers">
                         </div>
                     </div>
                 </div>
@@ -1057,9 +1071,14 @@ foreach ($result_user as $row) {
                         ไฟล์แนบ
                     </div>
 
+                    <div class="alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>หมายเหตุ:</strong> ไฟล์เดิมจะถูกเก็บไว้ คุณสามารถเพิ่มไฟล์ใหม่หรือลบไฟล์เดิมได้
+                    </div>
                     <div id="existingFilesSection" style="display: none;">
-                        <h6 class="mb-3">ไฟล์เดิม</h6>
+                        <!-- <h6 class="mb-3">ไฟล์เดิม</h6> -->
                         <div id="existingFilesList" class="file-list"></div>
+                        <input type="hidden" id="filesToDelete" name="filesToDelete" value="">
                     </div>
 
                     <h6 class="mb-3 mt-4">เพิ่มไฟล์ใหม่</h6>
@@ -1070,7 +1089,7 @@ foreach ($result_user as $row) {
                         <p class="text-muted mb-0">
                             <small>แต่ละไฟล์ไม่เกิน 2 MB / รวมทั้งหมดไม่เกิน 7 MB</small>
                         </p>
-                        <input type="file" id="fileInput" multiple hidden>
+                        <input type="file" id="fileInput" name="files[]" multiple hidden>
                     </div>
 
                     <div class="file-size-info text-center">
@@ -1137,7 +1156,8 @@ foreach ($result_user as $row) {
         });
     </script>
     <script>
-        const users = <?= json_encode($users, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT); ?>;
+        // const users = <?php echo json_encode($users); ?>;
+
         // const users = [{
         //         id: 1,
         //         name: 'สมชาย ใจดี',
@@ -1197,8 +1217,11 @@ foreach ($result_user as $row) {
         //     additionalUsers: [3]
         // };
 
+        const users = <?php echo json_encode($users); ?>;
+
         let mentionedUsers = [];
         let newFiles = [];
+        let selectedFiles = [];
         let additionalSelectedUsers = [];
         let totalFileSize = 0;
         let existingFilesToDelete = [];
@@ -1280,6 +1303,7 @@ foreach ($result_user as $row) {
                     </div>
                 `;
             }).join('');
+            console.log('existingFilesToDelete', existingFilesToDelete);
         }
 
         function removeExistingFile(fileId) {
@@ -1295,7 +1319,7 @@ foreach ($result_user as $row) {
             }
         }
 
-        // Mention System (same as create page)
+        // Mention System
         textarea.addEventListener('input', function() {
             const text = this.value;
             const cursorPos = this.selectionStart;
@@ -1321,6 +1345,12 @@ foreach ($result_user as $row) {
         });
 
         function showMentionDropdown(query) {
+            // ถ้าแท็ก @all แล้ว ไม่ให้แท็กคนอื่นเพิ่ม
+            if (isAllMentioned) {
+                hideMentionDropdown();
+                return;
+            }
+
             const filteredUsers = users.filter(user =>
                 user.name.toLowerCase().includes(query.toLowerCase()) &&
                 !mentionedUsers.some(mu => mu.id === user.id)
@@ -1330,16 +1360,55 @@ foreach ($result_user as $row) {
                 hideMentionDropdown();
                 return;
             }
+            // ตรวจสอบว่าพิมพ์ @all หรือไม่
+            const q = query.toLowerCase();
+            const isAllQuery = q === 'all' || 'all'.startsWith(q);
+            const isFullMatch = filteredUsers.length === users.length;
+
+            // แสดง @all เฉพาะตอนยังไม่พิมพ์อะไร
+            // หรือซ่อน @all ทันทีที่เลือก user ใด user หนึ่ง
+            if (isAllQuery && isFullMatch) {
+
+                mentionDropdown.innerHTML = `
+                    <div class="mention-item ${filteredUsers.length === 0 ? 'selected' : ''}" onclick="selectAllUsers()">
+                        <div class="mention-avatar" style="background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);">
+                            <i class="bi bi-people-fill"></i>
+                        </div>
+                        <div class="mention-info">
+                            <div class="mention-name">@all - แท็กทุกคน</div>
+                            <div class="mention-role">แท็กผู้ใช้ทั้งหมด ${users.length} คน</div>
+                        </div>
+                    </div>
+                    ${filteredUsers.map((user, index) => `
+                        <div class="mention-item ${index === 0 && filteredUsers.length > 0 ? 'selected' : ''}" onclick="selectUser(${user.id})">
+                            <div class="mention-avatar">${user.avatar}</div>
+                            <div class="mention-info">
+                                <div class="mention-name">${user.name}</div>
+                                <div class="mention-role">${user.role}</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                `;
+
+                const rect = textarea.getBoundingClientRect();
+                mentionDropdown.style.top = `${rect.bottom - rect.top + 5}px`;
+                mentionDropdown.style.left = '0';
+                mentionDropdown.classList.add('show');
+                selectedMentionIndex = 0;
+                return;
+            }
+
+
 
             mentionDropdown.innerHTML = filteredUsers.map((user, index) => `
-            <div class="mention-item ${index === 0 ? 'selected' : ''}" onclick="selectUser(${user.id})">
-                <div class="mention-avatar">${user.avatar}</div>
-                <div class="mention-info">
-                    <div class="mention-name">${user.name}</div>
-                    <div class="mention-role">${user.role}</div>
+                <div class="mention-item ${index === 0 ? 'selected' : ''}" onclick="selectUser(${user.id})">
+                    <div class="mention-avatar">${user.avatar}</div>
+                    <div class="mention-info">
+                        <div class="mention-name">${user.name}</div>
+                        <div class="mention-role">${user.role}</div>
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `).join('');
 
             const rect = textarea.getBoundingClientRect();
             mentionDropdown.style.top = `${rect.bottom - rect.top + 5}px`;
@@ -1353,9 +1422,50 @@ foreach ($result_user as $row) {
             currentMentionStart = -1;
         }
 
+        function selectAllUsers() {
+            // ลบแท็กรายบุคคลทั้งหมดออกก่อน
+            let text = textarea.value;
+            mentionedUsers.forEach(user => {
+                const mentionPattern = `@${user.name}`;
+                while (text.includes(mentionPattern)) {
+                    const pos = text.indexOf(mentionPattern);
+                    let endPos = pos + mentionPattern.length;
+                    if (text.charAt(endPos) === ' ') {
+                        endPos++;
+                    }
+                    text = text.substring(0, pos) + text.substring(endPos);
+                }
+            });
+
+            // เพิ่ม @all เข้าไป
+            const beforeMention = text.substring(0, currentMentionStart);
+            const afterMention = text.substring(currentMentionStart);
+            const mentionText = `@all `;
+
+            textarea.value = beforeMention + mentionText + afterMention;
+            textarea.value = beforeMention + mentionText;
+            const newPos = currentMentionStart + mentionText.length;
+            textarea.setSelectionRange(newPos, newPos);
+            textarea.focus();
+
+            // เซ็ตว่าใช้ @all
+            isAllMentioned = true;
+            mentionedUsers = [...users]; // คัดลอกทุกคน
+
+            updateMentionedUsers();
+            hideMentionDropdown();
+        }
+
         function selectUser(userId) {
             const user = users.find(u => u.id === userId);
             if (!user) return;
+
+            // ถ้ามี @all อยู่แล้ว ไม่ให้เพิ่มคนทีละคน
+            if (isAllMentioned) {
+                alert('⚠️ คุณใช้ @all อยู่แล้ว ไม่สามารถแท็กรายบุคคลเพิ่มได้\nกรุณาลบ @all ก่อนถ้าต้องการแท็กรายบุคคล');
+                hideMentionDropdown();
+                return;
+            }
 
             const text = textarea.value;
             const beforeMention = text.substring(0, currentMentionStart);
@@ -1377,23 +1487,67 @@ foreach ($result_user as $row) {
 
         function updateMentionedUsers() {
             const text = textarea.value;
-            mentionedUsers = mentionedUsers.filter(user =>
-                text.includes(`@${user.name}`)
-            );
+
+            // ตรวจสอบว่ามี @all หรือไม่
+            if (text.includes('@all')) {
+                isAllMentioned = true;
+                mentionedUsers = [...users]; // แท็กทุกคน
+                document.getElementById('mentionedList').innerText = `ทุกคน (${users.length} คน)`;
+            } else {
+                document.getElementById('mentionedList').innerText = ``;
+
+                isAllMentioned = false;
+                // กรองเฉพาะคนที่ยังมีชื่ออยู่ใน text
+                mentionedUsers = mentionedUsers.filter(user =>
+                    text.includes(`@${user.name}`)
+                );
+            }
 
             const container = document.getElementById('mentionedUsersContainer');
 
             if (mentionedUsers.length === 0) {
                 container.innerHTML = '<small class="text-muted">ยังไม่มีผู้ใช้ที่ถูกแท็ก</small>';
-                return;
+            } else {
+                // ถ้าเป็น @all แสดงแบบพิเศษ
+                if (isAllMentioned) {
+                    container.innerHTML = `
+                        <div class="tag-item" style="background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);">
+                            <i class="bi bi-people-fill me-1"></i>
+                            <span>@all - ทุกคน (${users.length} คน)</span>
+                            <span class="tag-remove" onclick="removeAllMention()">×</span>
+                        </div>
+                    `;
+
+                } else {
+                    container.innerHTML = mentionedUsers.map(user => `
+                        <div class="tag-item">
+                            <span>${user.name}</span>
+                            <span class="tag-remove" onclick="removeMentionedUser(${user.id})">×</span>
+                        </div>
+                    `).join('');
+                }
             }
 
-            container.innerHTML = mentionedUsers.map(user => `
-            <div class="tag-item">
-                <span>${user.name}</span>
-                <span class="tag-remove" onclick="removeMentionedUser(${user.id})">×</span>
-            </div>
-        `).join('');
+            // อัพเดท hidden input
+            if (isAllMentioned) {
+                document.getElementById('mentionedUsersInput').value = JSON.stringify(['all']);
+            } else {
+                document.getElementById('mentionedUsersInput').value = JSON.stringify(mentionedUsers.map(u => u.id));
+            }
+        }
+
+        // ลบ @all ออก
+        // text = text.replace('@all ', '').replace('@all', '');
+
+        function removeAllMention() {
+            let text = textarea.value;
+            text = text.replace('@all ', '').replace('@all', '');
+            textarea.value = text;
+
+            isAllMentioned = false;
+            mentionedUsers = [];
+            updateMentionedUsers();
+            textarea.focus();
         }
 
         function removeMentionedUser(userId) {
@@ -1420,75 +1574,131 @@ foreach ($result_user as $row) {
             textarea.focus();
         }
 
+        textarea.addEventListener('keydown', function(e) {
+            if (!mentionDropdown.classList.contains('show')) return;
+
+            const items = mentionDropdown.querySelectorAll('.mention-item');
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedMentionIndex = Math.min(selectedMentionIndex + 1, items.length - 1);
+                updateMentionSelection();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedMentionIndex = Math.max(selectedMentionIndex - 1, 0);
+                updateMentionSelection();
+            } else if (e.key === 'Enter' && items.length > 0) {
+                e.preventDefault();
+                items[selectedMentionIndex].click();
+            } else if (e.key === 'Escape') {
+                hideMentionDropdown();
+            }
+        });
+
+        function updateMentionSelection() {
+            const items = mentionDropdown.querySelectorAll('.mention-item');
+            items.forEach((item, index) => {
+                item.classList.toggle('selected', index === selectedMentionIndex);
+            });
+        }
+
         // Additional Users
         function loadAdditionalUsers() {
             renderUserList(users);
         }
 
         function renderUserList(userList) {
-
-            const isPrivileged =
-                sessionUserStatus === 'admin' ||
-                sessionUserStatus === 'executive';
-
             const container = document.getElementById('userSelectionList');
 
-            container.innerHTML = userList.map(user => {
-                const isSelf = user.id === sessionUserId;
-                const disabled = !isPrivileged && !isSelf;
-
-                return `
-                <div class="user-selection-item ${disabled ? 'disabled' : ''}"
-                     ${!disabled ? `onclick="toggleUserSelection(${user.id})"` : ''}>
-
-                    <input type="checkbox"
-                           class="user-checkbox"
-                           ${additionalSelectedUsers.includes(user.id) ? 'checked' : ''}
-                           ${disabled ? 'disabled' : ''}
-                           onclick="event.stopPropagation(); toggleUserSelection(${user.id})">
-                    <div class="user-selection-avatar">${user.avatar}</div>
-
-                    <div class="user-selection-info">
-                        <div class="user-selection-name">
-                            ${user.name}
-                            ${disabled ? '<small class="text-muted">(เลือกไม่ได้)</small>' : ''}
-                        </div>
-                        <div class="user-selection-role">${user.role}</div>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-
-        function toggleUserSelection(userId) {
-
-            const isPrivileged =
-                sessionUserStatus === 'admin' ||
-                sessionUserStatus === 'executive';
-
-            // 🔒 user ทั่วไป เลือกได้เฉพาะตัวเอง
-            if (!isPrivileged && userId !== sessionUserId) {
+            if (userList.length === 0) {
+                container.innerHTML = '<div class="no-results"><i class="bi bi-search"></i><p class="mt-2">ไม่พบผู้ใช้</p></div>';
                 return;
             }
 
-            const index = additionalSelectedUsers.indexOf(userId);
+            container.innerHTML = userList.map(user => `
+                <div class="user-selection-item ${additionalSelectedUsers.includes(user.id) ? 'selected' : ''}" 
+                     onclick="toggleUserSelection(${user.id})">
+                    <input type="checkbox" class="user-checkbox" 
+                           ${additionalSelectedUsers.includes(user.id) ? 'checked' : ''}
+                           onclick="event.stopPropagation(); toggleUserSelection(${user.id})">
+                    <div class="user-selection-avatar">${user.avatar}</div>
+                    <div class="user-selection-info">
+                        <div class="user-selection-name">${user.name}</div>
+                        <div class="user-selection-role">${user.role}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
 
-            // ⚠️ กำลังจะเอาตัวเองออก
-            if (userId === sessionUserId && index > -1) {
-                const confirmed = confirm(
-                    'หากคุณนำตัวเองออกจากผู้เกี่ยวข้อง คุณจะไม่สามารถเห็นงานนี้ได้อีก\n\nต้องการดำเนินการต่อหรือไม่?'
-                );
+        // ฟังก์ชันเลือก/ยกเลิกทั้งหมด
+        function toggleSelectAll() {
+            const selectAllCheckbox = document.getElementById('selectAllUsers');
 
-                if (!confirmed) return;
+            if (selectAllCheckbox.checked) {
+                // เลือกทั้งหมด - เพิ่มทุกคนที่ยังไม่ได้เลือก
+                additionalSelectedUsers = users.map(u => u.id);
+            } else {
+                // ยกเลิกทั้งหมด - ล้างรายการ
+                additionalSelectedUsers = [];
             }
 
+            updateAdditionalUsersDisplay();
+            updateUserSelectionListCheckboxes(); // อัพเดท checkbox และ class
+        }
+
+        // ฟังก์ชันตรวจสอบและอัพเดทสถานะ "เลือกทั้งหมด"
+        function updateSelectAllCheckbox() {
+            const selectAllCheckbox = document.getElementById('selectAllUsers');
+
+            // ถ้าเลือกครบทุกคน ให้ check "เลือกทั้งหมด"
+            if (additionalSelectedUsers.length === users.length && users.length > 0) {
+                selectAllCheckbox.checked = true;
+            } else {
+                selectAllCheckbox.checked = false;
+            }
+        }
+
+        // ฟังก์ชันอัพเดท checkbox และ class selected ใน userSelectionList
+        function updateUserSelectionListCheckboxes() {
+            users.forEach(user => {
+                // หา user-selection-item
+                const items = document.querySelectorAll('.user-selection-item');
+
+                items.forEach(item => {
+                    // เช็คว่า item นี้เป็นของ user คนไหน (ดูจาก onclick attribute)
+                    const onclickAttr = item.getAttribute('onclick');
+                    if (onclickAttr && onclickAttr.includes(`toggleUserSelection(${user.id})`)) {
+                        const checkbox = item.querySelector('.user-checkbox');
+
+                        if (additionalSelectedUsers.includes(user.id)) {
+                            // เลือกแล้ว
+                            item.classList.add('selected');
+                            if (checkbox) checkbox.checked = true;
+                        } else {
+                            // ยังไม่เลือก
+                            item.classList.remove('selected');
+                            if (checkbox) checkbox.checked = false;
+                        }
+                    }
+                });
+            });
+        }
+
+
+        function toggleUserSelection(userId) {
+            const index = additionalSelectedUsers.indexOf(userId);
+
             if (index > -1) {
+                // ถ้ามีอยู่แล้ว ให้ลบออก
                 additionalSelectedUsers.splice(index, 1);
             } else {
+                // ถ้ายังไม่มี ให้เพิ่มเข้าไป
                 additionalSelectedUsers.push(userId);
             }
 
             updateAdditionalUsersDisplay();
-            renderUserList(filterUsersBySearch());
+            updateUserSelectionListCheckboxes(); // อัพเดท checkbox และ class
+            updateSelectAllCheckbox(); // เช็คว่าต้องอัพเดท "เลือกทั้งหมด" หรือไม่
         }
 
         function updateAdditionalUsersDisplay() {
@@ -1496,34 +1706,39 @@ foreach ($result_user as $row) {
 
             if (additionalSelectedUsers.length === 0) {
                 container.innerHTML = '<small class="text-muted">ยังไม่ได้เลือกผู้ใช้เพิ่มเติม</small>';
-                return;
+            } else {
+                const selectedUserObjects = users.filter(u => additionalSelectedUsers.includes(u.id));
+                container.innerHTML = selectedUserObjects.map(user => `
+                    <div class="tag-item">
+                        <span>${user.name}</span>
+                        <span class="tag-remove" onclick="toggleUserSelection(${user.id})">×</span>
+                    </div>
+                `).join('');
             }
 
-            const isPrivileged =
-                sessionUserStatus === 'admin' ||
-                sessionUserStatus === 'executive';
+            // อัพเดท hidden input
+            document.getElementById('additionalUsersInput').value = JSON.stringify(additionalSelectedUsers);
+        }
 
-            const selectedUserObjects = users.filter(u =>
-                additionalSelectedUsers.includes(u.id)
-            );
+        // ฟังก์ชันสร้างรายการผู้ใช้
+        function updateUserSelectionList(userList = users) {
+            const container = document.getElementById('userSelectionList');
 
-            container.innerHTML = selectedUserObjects.map(user => {
-                const canRemove = isPrivileged || user.id === sessionUserId;
-
-                return `
-                <div class="tag-item ${!canRemove ? 'disabled' : ''}">
-                    <span>${user.name}</span>
-                    ${canRemove ? `
-                        <span class="tag-remove"
-                              onclick="toggleUserSelection(${user.id})">×</span>
-                    ` : `
-                        <span class="text-muted small ms-1">(ลบไม่ได้)</span>
-                    `}
+            container.innerHTML = userList.map(user => `
+                <div class="user-selection-item ${additionalSelectedUsers.includes(user.id) ? 'selected' : ''}" 
+                     onclick="toggleUserSelection(${user.id})">
+                    <input type="checkbox" class="user-checkbox" 
+                           ${additionalSelectedUsers.includes(user.id) ? 'checked' : ''}
+                           onclick="event.stopPropagation(); toggleUserSelection(${user.id})">
+                    <div class="user-selection-avatar">${user.avatar}</div>
+                    <div class="user-selection-info">
+                        <div class="user-selection-name">${user.name}</div>
+                        <div class="user-selection-role">${user.role}</div>
+                    </div>
                 </div>
-                `;
-            }).join('');
+            `).join('');
 
-
+            updateSelectAllCheckbox(); // อัพเดทสถานะ "เลือกทั้งหมด"
         }
 
         document.getElementById('userSearchInput').addEventListener('input', function() {
@@ -1606,12 +1821,33 @@ foreach ($result_user as $row) {
             handleFiles(e.dataTransfer.files);
         });
 
-        fileInput.addEventListener('change', (e) => {
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            console.group('📂 [DEBUG FILE INPUT] change');
+
+            const files = fileInput.files;
+
+            console.log('จำนวนไฟล์ทั้งหมด:', files.length);
+
+            if (files.length === 0) {
+                console.log('— ไม่มีไฟล์ —');
+            } else {
+                Array.from(files).forEach((file, index) => {
+                    console.log(`#${index + 1}`, {
+                        name: file.name,
+                        sizeKB: (file.size / 1024).toFixed(2) + ' KB',
+                        type: file.type,
+                        lastModified: new Date(file.lastModified).toLocaleString()
+                    });
+                });
+            }
+
+            console.groupEnd();
             handleFiles(e.target.files);
         });
 
         function handleFiles(files) {
             for (let file of files) {
+
                 if (file.size > MAX_FILE_SIZE) {
                     alert(`ไฟล์ "${file.name}" มีขนาดใหญ่เกิน 2 MB`);
                     continue;
@@ -1622,13 +1858,24 @@ foreach ($result_user as $row) {
                     break;
                 }
 
-                newFiles.push(file);
+                // กันไฟล์ชื่อซ้ำ
+                if (selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+                    continue;
+                }
+
+                selectedFiles.push(file);
                 totalFileSize += file.size;
                 addFileToList(file);
             }
 
+            syncInputFiles();
             updateTotalSize();
-            fileInput.value = '';
+        }
+
+        function syncInputFiles() {
+            const dataTransfer = new DataTransfer();
+            selectedFiles.forEach(file => dataTransfer.items.add(file));
+            fileInput.files = dataTransfer.files;
         }
 
         function addFileToList(file) {
@@ -1662,14 +1909,15 @@ foreach ($result_user as $row) {
             if (!fileDiv) return;
 
             const fileName = fileDiv.dataset.fileName;
-            const fileIndex = newFiles.findIndex(f => f.name === fileName);
 
-            if (fileIndex > -1) {
-                totalFileSize -= newFiles[fileIndex].size;
-                newFiles.splice(fileIndex, 1);
+            const index = selectedFiles.findIndex(f => f.name === fileName);
+            if (index > -1) {
+                totalFileSize -= selectedFiles[index].size;
+                selectedFiles.splice(index, 1);
             }
 
             fileDiv.remove();
+            syncInputFiles(); // 🔥 สำคัญ
             updateTotalSize();
         }
 
@@ -1705,37 +1953,38 @@ foreach ($result_user as $row) {
         }
 
         // Form Submission
-        document.getElementById('editTaskForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+        const form = document.getElementById('editTaskForm');
 
-            if (!importanceInput.value || importanceInput.value === '0') {
-                alert('กรุณาเลือกระดับความเร่งด่วน');
-                return;
-            }
+        form.addEventListener('submit', function(e) {
+            e.preventDefault(); // ดักไว้ก่อน
 
-            const formData = new FormData();
-            formData.append('taskId', existingTask.id);
-            formData.append('title', document.getElementById('taskTitle').value);
-            formData.append('category', document.getElementById('taskCategory').value);
-            formData.append('description', document.getElementById('taskDescription').value);
-            formData.append('status', document.getElementById('taskStatus').value);
-            formData.append('importance', importanceInput.value);
-            formData.append('mentionedUsers', JSON.stringify(mentionedUsers.map(u => u.id)));
-            formData.append('additionalUsers', JSON.stringify(additionalSelectedUsers));
-            formData.append('deletedFiles', JSON.stringify(existingFilesToDelete));
+            console.group('🚀 FINAL FILES BEFORE SUBMIT');
 
-            newFiles.forEach((file, index) => {
-                formData.append(`files[${index}]`, file);
+            console.log('selectedFiles:', selectedFiles.length);
+            console.log('fileInput.files:', fileInput.files.length);
+
+            Array.from(fileInput.files).forEach((f, i) => {
+                console.log(`#${i + 1}`, f.name, f.size, f.type);
             });
 
-            const submitBtn = document.querySelector('.btn-submit');
-            submitBtn.innerHTML = '<i class="bi bi-arrow-repeat me-2"></i>กำลังบันทึก...';
-            submitBtn.disabled = true;
+            console.groupEnd();
+            Swal.fire({
+                title: 'ยืนยันการบันทึก?',
+                text: 'คุณต้องการบันทึกการแก้ไขงานนี้หรือไม่',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'บันทึก',
+                cancelButtonText: 'ยกเลิก',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    document.getElementById('mentionedUsersInput').value = JSON.stringify(mentionedUsers.map(u => u.id));
+                    document.getElementById('additionalUsersInput').value = JSON.stringify(additionalSelectedUsers);
+                    document.getElementById('filesToDelete').value = existingFilesToDelete.join(',');
 
-            setTimeout(() => {
-                alert('บันทึกการแก้ไขสำเร็จ!');
-                window.location.href = 'task_detail.php?taskID=abc123';
-            }, 1500);
+                    form.submit(); // ✅ submit จริง → POST + FILE ไป action.php
+                }
+            });
         });
 
         function cancelEdit() {
