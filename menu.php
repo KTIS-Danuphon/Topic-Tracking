@@ -1,5 +1,11 @@
 <?php
 $currentPage = basename($_SERVER['PHP_SELF']);
+$table = 'tb_notifications_c050968 nt';
+$fields = 'COUNT(*) AS count_notification ';
+$where = 'LEFT JOIN tb_notification_users_c050968 ntu ON ntu.fd_notification_id = nt.fd_notification_id ';
+$where .= 'WHERE nt.fd_is_deleted = "0" AND ntu.fd_user_id = "' . $_SESSION['user_id'] . '" AND ntu.fd_is_read = "0" AND ntu.fd_is_deleted = "0" ';
+$result_notification = $object->ReadData($table, $fields, $where);
+$count_notification = $result_notification[0]['count_notification'];
 ?>
 <!-- Top Navbar -->
 <nav class="top-navbar">
@@ -15,7 +21,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     <div class="navbar-right">
         <button class="notification-btn" onclick="showNotifications()">
             <i class="bi bi-bell"></i>
-            <span class="notification-badge">5</span>
+            <?= ($count_notification ?? 0) == 0 ? '' : '<span class="notification-badge">' . $count_notification . '</span>' ?>
         </button>
 
         <div class="user-profile" onclick="toggleUserMenu()">
@@ -54,15 +60,15 @@ $currentPage = basename($_SERVER['PHP_SELF']);
             <a href="notifications.php" class="menu-link <?= $currentPage == 'notifications.php' ? 'active' : '' ?>">
                 <i class="bi bi-bell"></i>
                 <span>แจ้งเตือน</span>
-                <span class="menu-badge">5</span>
+                <?= ($count_notification ?? 0) == 0 ? '' : '<span class="menu-badge">' . $count_notification . '</span>' ?>
             </a>
         </li>
-        <li class="menu-item">
+        <!-- <li class="menu-item">
             <a href="calendar.php" class="menu-link <?= $currentPage == 'calendar.php' ? 'active' : '' ?>">
                 <i class="bi bi-calendar3"></i>
                 <span>ปฏิทิน</span>
             </a>
-        </li>
+        </li> -->
 
     </ul>
 
@@ -81,7 +87,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
         <li class="menu-item">
             <a href="categories.php" class="menu-link <?= $currentPage == 'categories.php' ? 'active' : '' ?>">
                 <i class="bi bi-tags"></i>
-                <span>หมวดหมู่</span>
+                <span>จัดการฝ่าย</span>
             </a>
         </li>
 
@@ -110,3 +116,21 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 
 <!-- Sidebar Overlay (Mobile) -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    function logout() {
+        Swal.fire({
+            title: 'ออกจากระบบ',
+            text: 'คุณต้องการออกจากระบบใช่หรือไม่ ?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'ใช่, ออกจากระบบ',
+            cancelButtonText: 'ยกเลิก',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                window.location.href = 'logout.php';
+            }
+        });
+    }
+</script>
