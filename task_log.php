@@ -5,8 +5,7 @@ function Task_log($taskID, $type, $name_create = null, $object, $formatted_now)
 
     // เช็คว่ามี log งานนี้ในเวลานี้แล้วหรือยัง
     $fields = 'COUNT(*) AS countlog';
-    $where = 'WHERE fd_topic_id = "' . intval($taskID) . '"
-          AND fd_topic_log_type = "' . $type . '"';
+    $where = 'WHERE fd_topic_id = ' . intval($taskID) . ' AND fd_topic_log_type = "' . $type . '" AND fd_topic_log_time >= DATE_SUB(NOW(), INTERVAL 3 SECOND)';
 
     $check = $object->ReadData($table, $fields, $where);
 
@@ -26,7 +25,7 @@ function Task_log($taskID, $type, $name_create = null, $object, $formatted_now)
             $text_log = "เพิ่มความคิดเห็นโดย " . $name_create;
             break;
         case 'file':
-            $text_log = "จัดการไฟล์ไฟล์โดย " . $name_create;
+            $text_log = "จัดการไฟล์โดย " . $name_create;
             break;
         case 'delete-task':
             $text_log = "ลบงานโดย " . $name_create;
