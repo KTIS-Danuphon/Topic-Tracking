@@ -123,22 +123,31 @@ $existingTask['existingFiles'] = $existingFiles;
 
 // เตรียมข้อมูลผู้ใช้สำหรับ mention
 $users = [];
+$createdBy = $result_topic[0]['fd_topic_created_by'];
+
 foreach ($result_user as $row) {
+
+    // ถ้าเป็นคนสร้างงาน → ไม่ต้องเอาเข้า list
+    if ($row['fd_user_id'] == $createdBy) {
+        continue;
+    }
+
     $fullname = $row['fd_user_fullname'];
     $nameParts = explode(' ', $fullname);
 
     $avatar = '';
     foreach ($nameParts as $p) {
-        $avatar .= mb_substr($p, 0, 1); //ตัวแรกของชื่อและสกุล
+        $avatar .= mb_substr($p, 0, 1);
     }
 
     $users[] = [
         'id'     => $row['fd_user_id'],
         'name'   => $fullname,
-        'role'   => $row['fd_dept_name'], // ชื่อฝ่ายงาน
+        'role'   => $row['fd_dept_name'],
         'avatar' => $avatar
     ];
 }
+
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -1154,6 +1163,11 @@ foreach ($result_user as $row) {
     <script>
         const sessionUserId = <?= json_encode($_SESSION['user_id']) ?>;
         const sessionUserStatus = <?= json_encode($_SESSION['user_status']) ?>;
+        const createbyUser = <?= json_encode($result_topic[0]['fd_topic_created_by']) ?>;
+        let UserStatus = '';
+        if (sessionUserId == createbyUser) {
+            UserStatus = 'creator';
+        }
     </script>
     <script>
         // Sidebar Toggle
@@ -1646,42 +1660,8 @@ foreach ($result_user as $row) {
 
             const isPrivileged =
                 sessionUserStatus === 'admin' ||
-                sessionUserStatus === 'executive';
-
-            const container = document.getElementById('userSelectionList');
-
-            container.innerHTML = userList.map(user => {
-                const isSelf = user.id === sessionUserId;
-                const disabled = !isPrivileged && !isSelf;
-
-
-                return `
-                <div class="user-selection-item ${disabled ? 'disabled' : ''}"
-                     ${!disabled ? `onclick="toggleUserSelection(${user.id})"` : ''}>
-
-                    <input type="checkbox"
-                           class="user-checkbox"
-                           ${additionalSelectedUsers.includes(user.id) ? 'checked' : ''}
-                           ${disabled ? 'disabled' : ''}
-                           onclick="event.stopPropagation(); toggleUserSelection(${user.id})">
-                    <div class="user-selection-avatar">${user.avatar}</div>
-
-                    <div class="user-selection-info">
-                        <div class="user-selection-name">
-                            ${user.name}
-                            ${disabled ? '<small class="text-muted">(เลือกไม่ได้)</small>' : ''}
-                        </div>
-                        <div class="user-selection-role">${user.role}</div>
-                    </div>
-                </div>`;
-            }).join('');
-        }
-
-        function renderUserList(userList) {
-
-            const isPrivileged =
-                sessionUserStatus === 'admin' ||
-                sessionUserStatus === 'executive';
+                sessionUserStatus === 'executive' ||
+                UserStatus === 'creator';
 
             const container = document.getElementById('userSelectionList');
 
@@ -1716,7 +1696,8 @@ foreach ($result_user as $row) {
 
             const isPrivileged =
                 sessionUserStatus === 'admin' ||
-                sessionUserStatus === 'executive';
+                sessionUserStatus === 'executive' ||
+                UserStatus === 'creator';
 
             // 🔒 user ทั่วไป เลือกได้เฉพาะตัวเอง
             if (!isPrivileged && userId !== sessionUserId) {
