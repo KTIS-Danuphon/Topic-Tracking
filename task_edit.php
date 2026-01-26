@@ -17,6 +17,41 @@ if (empty($TaskID)) {
     header('Location: tasks.php');
     exit();
 }
+
+// เช็คสิทธิ์การดูข้อมูล
+$table = 'tb_topics_c050968';
+$fields = 'fd_topic_id, fd_topic_title, fd_topic_detail, fd_topic_category, fd_topic_mentioned, fd_topic_status, fd_topic_participant, fd_topic_created_by, fd_topic_importance, fd_topic_private, fd_topic_active, fd_topic_created_at ';
+switch ($_SESSION['user_status']) {
+    //admin / executive → เห็น user ทุกคน
+    case 'admin':
+    case 'executive':
+        $where = 'WHERE fd_topic_active = "1"   ';
+        break;
+    //user → เห็นเฉพาะคนอื่นในแผนกเดียวกัน มีสถานะเป็น user และ active
+    case 'user':
+    default:
+        $userId = (int) $_SESSION['user_id'];
+
+        $where  = 'WHERE fd_topic_id = ' . $TaskID . ' AND fd_topic_active = 1 ';
+        $where .= 'AND ( ';
+        $where .= 'fd_topic_created_by = ' . $userId . ' ';
+        $where .= 'OR fd_topic_participant  = "[' . $userId . ']" ';
+        $where .= 'OR fd_topic_participant  LIKE "[' . $userId . ',%" ';
+        $where .= 'OR fd_topic_participant  LIKE "%,' . $userId . ',%" ';
+        $where .= 'OR fd_topic_participant  LIKE "%,' . $userId . ']" ';
+        $where .= ') ';
+        break;
+}
+$where .= ' ORDER BY fd_topic_created_at DESC ';
+$result_topic_check = $object->ReadData($table, $fields, $where);
+if (empty($result_topic_check)) {
+    echo "<script>
+        alert('ไม่มีงานนี้อยู่ หรือคุณไม่มีสิทธิ์ดูข้อมูลนี้');
+        window.location.href = 'tasks.php';
+    </script>";
+    exit();
+}
+
 // ดึงข้อมูลงาน
 $table = 'tb_topics_c050968';
 $fields = 'fd_topic_id, fd_topic_title, fd_topic_detail, fd_topic_category, fd_topic_mentioned, fd_topic_status, fd_topic_participant, fd_topic_created_by, fd_topic_due_date, fd_topic_importance, fd_topic_private, fd_topic_active, fd_topic_created_at ';
@@ -1608,27 +1643,146 @@ foreach ($result_user as $row) {
         }
 
         function renderUserList(userList) {
+
+            const isPrivileged =
+                sessionUserStatus === 'admin' ||
+                sessionUserStatus === 'executive';
+
             const container = document.getElementById('userSelectionList');
 
-            if (userList.length === 0) {
-                container.innerHTML = '<div class="no-results"><i class="bi bi-search"></i><p class="mt-2">ไม่พบผู้ใช้</p></div>';
+            container.innerHTML = userList.map(user => {
+                const isSelf = user.id === sessionUserId;
+                const disabled = !isPrivileged && !isSelf;
+
+
+                return `
+                <div class="user-selection-item ${disabled ? 'disabled' : ''}"
+                     ${!disabled ? `onclick="toggleUserSelection(${user.id})"` : ''}>
+
+                    <input type="checkbox"
+                           class="user-checkbox"
+                           ${additionalSelectedUsers.includes(user.id) ? 'checked' : ''}
+                           ${disabled ? 'disabled' : ''}
+                           onclick="event.stopPropagation(); toggleUserSelection(${user.id})">
+                    <div class="user-selection-avatar">${user.avatar}</div>
+
+                    <div class="user-selection-info">
+                        <div class="user-selection-name">
+                            ${user.name}
+                            ${disabled ? '<small class="text-muted">(เลือกไม่ได้)</small>' : ''}
+                        </div>
+                        <div class="user-selection-role">${user.role}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderUserList(userList) {
+
+            const isPrivileged =
+                sessionUserStatus === 'admin' ||
+                sessionUserStatus === 'executive';
+
+            const container = document.getElementById('userSelectionList');
+
+            container.innerHTML = userList.map(user => {
+                const isSelf = user.id === sessionUserId;
+                const disabled = !isPrivileged && !isSelf;
+
+
+                return `
+                <div class="user-selection-item ${disabled ? 'disabled' : ''}"
+                     ${!disabled ? `onclick="toggleUserSelection(${user.id})"` : ''}>
+
+                    <input type="checkbox"
+                           class="user-checkbox"
+                           ${additionalSelectedUsers.includes(user.id) ? 'checked' : ''}
+                           ${disabled ? 'disabled' : ''}
+                           onclick="event.stopPropagation(); toggleUserSelection(${user.id})">
+                    <div class="user-selection-avatar">${user.avatar}</div>
+
+                    <div class="user-selection-info">
+                        <div class="user-selection-name">
+                            ${user.name}
+                            ${disabled ? '<small class="text-muted">(เลือกไม่ได้)</small>' : ''}
+                        </div>
+                        <div class="user-selection-role">${user.role}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleUserSelection(userId) {
+
+            const isPrivileged =
+                sessionUserStatus === 'admin' ||
+                sessionUserStatus === 'executive';
+
+            // 🔒 user ทั่วไป เลือกได้เฉพาะตัวเอง
+            if (!isPrivileged && userId !== sessionUserId) {
                 return;
             }
 
-            container.innerHTML = userList.map(user => `
-                <div class="user-selection-item ${additionalSelectedUsers.includes(user.id) ? 'selected' : ''}" 
-                     onclick="toggleUserSelection(${user.id})">
-                    <input type="checkbox" class="user-checkbox" 
-                           ${additionalSelectedUsers.includes(user.id) ? 'checked' : ''}
-                           onclick="event.stopPropagation(); toggleUserSelection(${user.id})">
-                    <div class="user-selection-avatar">${user.avatar}</div>
-                    <div class="user-selection-info">
-                        <div class="user-selection-name">${user.name}</div>
-                        <div class="user-selection-role">${user.role}</div>
-                    </div>
-                </div>
-            `).join('');
+            const index = additionalSelectedUsers.indexOf(userId);
+
+            // ⚠️ กำลังจะเอาตัวเองออก
+            if (userId === sessionUserId && index > -1) {
+                const confirmed = confirm(
+                    'หากคุณนำตัวเองออกจากผู้เกี่ยวข้อง คุณจะไม่สามารถเห็นงานนี้ได้อีก\n\nต้องการดำเนินการต่อหรือไม่?'
+                );
+
+                if (!confirmed) return;
+            }
+
+
+            if (index > -1) {
+                // ถ้ามีอยู่แล้ว ให้ลบออก
+                additionalSelectedUsers.splice(index, 1);
+            } else {
+                // ถ้ายังไม่มี ให้เพิ่มเข้าไป
+                additionalSelectedUsers.push(userId);
+            }
+
+            updateAdditionalUsersDisplay();
+            updateUserSelectionListCheckboxes(); // อัพเดท checkbox และ class
+            updateSelectAllCheckbox(); // เช็คว่าต้องอัพเดท "เลือกทั้งหมด" หรือไม่
+            renderUserList(filterUsersBySearch());
+
         }
+
+        function updateAdditionalUsersDisplay() {
+            const container = document.getElementById('additionalUsersContainer');
+
+            if (additionalSelectedUsers.length === 0) {
+                container.innerHTML = '<small class="text-muted">ยังไม่ได้เลือกผู้ใช้เพิ่มเติม</small>';
+                return;
+            }
+
+            const isPrivileged =
+                sessionUserStatus === 'admin' ||
+                sessionUserStatus === 'executive';
+
+            const selectedUserObjects = users.filter(u =>
+                additionalSelectedUsers.includes(u.id)
+            );
+
+            container.innerHTML = selectedUserObjects.map(user => {
+                const canRemove = isPrivileged || user.id === sessionUserId;
+
+                return `
+                <div class="tag-item ${!canRemove ? 'disabled' : ''}">
+                    <span>${user.name}</span>
+                    ${canRemove ? `
+                        <span class="tag-remove"
+                              onclick="toggleUserSelection(${user.id})">×</span>
+                    ` : `
+                        <span class="text-muted small ms-1">(ลบไม่ได้)</span>
+                    `}
+                </div>
+                `;
+            }).join('');
+        }
+
 
         // ฟังก์ชันเลือก/ยกเลิกทั้งหมด
         function toggleSelectAll() {
@@ -1685,40 +1839,40 @@ foreach ($result_user as $row) {
         }
 
 
-        function toggleUserSelection(userId) {
-            const index = additionalSelectedUsers.indexOf(userId);
+        // function toggleUserSelection(userId) {
+        //     const index = additionalSelectedUsers.indexOf(userId);
 
-            if (index > -1) {
-                // ถ้ามีอยู่แล้ว ให้ลบออก
-                additionalSelectedUsers.splice(index, 1);
-            } else {
-                // ถ้ายังไม่มี ให้เพิ่มเข้าไป
-                additionalSelectedUsers.push(userId);
-            }
+        //     if (index > -1) {
+        //         // ถ้ามีอยู่แล้ว ให้ลบออก
+        //         additionalSelectedUsers.splice(index, 1);
+        //     } else {
+        //         // ถ้ายังไม่มี ให้เพิ่มเข้าไป
+        //         additionalSelectedUsers.push(userId);
+        //     }
 
-            updateAdditionalUsersDisplay();
-            updateUserSelectionListCheckboxes(); // อัพเดท checkbox และ class
-            updateSelectAllCheckbox(); // เช็คว่าต้องอัพเดท "เลือกทั้งหมด" หรือไม่
-        }
+        //     updateAdditionalUsersDisplay();
+        //     updateUserSelectionListCheckboxes(); // อัพเดท checkbox และ class
+        //     updateSelectAllCheckbox(); // เช็คว่าต้องอัพเดท "เลือกทั้งหมด" หรือไม่
+        // }
 
-        function updateAdditionalUsersDisplay() {
-            const container = document.getElementById('additionalUsersContainer');
+        // function updateAdditionalUsersDisplay() {
+        //     const container = document.getElementById('additionalUsersContainer');
 
-            if (additionalSelectedUsers.length === 0) {
-                container.innerHTML = '<small class="text-muted">ยังไม่ได้เลือกผู้ใช้เพิ่มเติม</small>';
-            } else {
-                const selectedUserObjects = users.filter(u => additionalSelectedUsers.includes(u.id));
-                container.innerHTML = selectedUserObjects.map(user => `
-                    <div class="tag-item">
-                        <span>${user.name}</span>
-                        <span class="tag-remove" onclick="toggleUserSelection(${user.id})">×</span>
-                    </div>
-                `).join('');
-            }
+        //     if (additionalSelectedUsers.length === 0) {
+        //         container.innerHTML = '<small class="text-muted">ยังไม่ได้เลือกผู้ใช้เพิ่มเติม</small>';
+        //     } else {
+        //         const selectedUserObjects = users.filter(u => additionalSelectedUsers.includes(u.id));
+        //         container.innerHTML = selectedUserObjects.map(user => `
+        //             <div class="tag-item">
+        //                 <span>${user.name}</span>
+        //                 <span class="tag-remove" onclick="toggleUserSelection(${user.id})">×</span>
+        //             </div>
+        //         `).join('');
+        //     }
 
-            // อัพเดท hidden input
-            document.getElementById('additionalUsersInput').value = JSON.stringify(additionalSelectedUsers);
-        }
+        //     // อัพเดท hidden input
+        //     document.getElementById('additionalUsersInput').value = JSON.stringify(additionalSelectedUsers);
+        // }
 
         // ฟังก์ชันสร้างรายการผู้ใช้
         function updateUserSelectionList(userList = users) {

@@ -17,6 +17,41 @@ if (empty($TaskID)) {
     header('Location: tasks.php');
     exit();
 }
+
+// เช็คสิทธิ์การดูข้อมูล
+$table = 'tb_topics_c050968';
+$fields = 'fd_topic_id, fd_topic_title, fd_topic_detail, fd_topic_category, fd_topic_mentioned, fd_topic_status, fd_topic_participant, fd_topic_created_by, fd_topic_importance, fd_topic_private, fd_topic_active, fd_topic_created_at ';
+switch ($_SESSION['user_status']) {
+    //admin / executive → เห็น user ทุกคน
+    case 'admin':
+    case 'executive':
+        $where = 'WHERE fd_topic_active = "1"   ';
+        break;
+    //user → เห็นเฉพาะคนอื่นในแผนกเดียวกัน มีสถานะเป็น user และ active
+    case 'user':
+    default:
+        $userId = (int) $_SESSION['user_id'];
+
+        $where  = 'WHERE fd_topic_id = ' . $TaskID . ' AND fd_topic_active = 1 ';
+        $where .= 'AND ( ';
+        $where .= 'fd_topic_created_by = ' . $userId . ' ';
+        $where .= 'OR fd_topic_participant  = "[' . $userId . ']" ';
+        $where .= 'OR fd_topic_participant  LIKE "[' . $userId . ',%" ';
+        $where .= 'OR fd_topic_participant  LIKE "%,' . $userId . ',%" ';
+        $where .= 'OR fd_topic_participant  LIKE "%,' . $userId . ']" ';
+        $where .= ') ';
+        break;
+}
+$where .= ' ORDER BY fd_topic_created_at DESC ';
+$result_topic_check = $object->ReadData($table, $fields, $where);
+if (empty($result_topic_check)) {
+    echo "<script>
+        alert('ไม่มีงานนี้อยู่ หรือคุณไม่มีสิทธิ์ดูข้อมูลนี้');
+        window.location.href = 'tasks.php';
+    </script>";
+    exit();
+}
+
 // ดึงข้อมูลงาน
 $table = 'tb_topics_c050968';
 $fields = 'fd_topic_id, fd_topic_title, fd_topic_detail, fd_topic_category, fd_topic_mentioned, fd_topic_status, fd_topic_participant, fd_topic_created_by, fd_topic_due_date, fd_topic_importance, fd_topic_private, fd_topic_active, fd_topic_created_at ';
@@ -27,7 +62,11 @@ $result_participant = trim($result_topic[0]['fd_topic_participant'], '[]'); // �
 $table = 'tb_users_c050968 user';
 $fields = 'user.fd_user_id, user.fd_user_fullname, dept.fd_dept_name ';
 $where = 'LEFT JOIN tb_departments_c050968 dept ON dept.fd_dept_id = user.fd_user_dept ';
-$where .= 'WHERE user.fd_user_id  IN (' . $result_participant . ') AND user.fd_user_active = "1" ';
+if (empty($result_participant)) {
+    $where .= 'WHERE user.fd_user_id  IN (' .  0 . ') AND user.fd_user_active = "1" ';
+} else {
+    $where .= 'WHERE user.fd_user_id  IN (' . $result_participant . ') AND user.fd_user_active = "1" ';
+}
 $result_user = $object->ReadData($table, $fields, $where);
 foreach ($result_user as &$row) {
     $fullname = $row['fd_user_fullname'];
@@ -66,7 +105,7 @@ $taskData = [
 ];
 
 $taskData['team'] = $result_user; // ดึงผู้เกี่ยวข้องจากฐานข้อมูลถ้ามี
- // ดึงไฟล์จากฐานข้อมูลถ้ามี
+// ดึงไฟล์จากฐานข้อมูลถ้ามี
 if (is_array($result_files)) {
     foreach ($result_files as &$file) {
         if (isset($file['fd_file_id'])) {
@@ -1187,7 +1226,8 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
         }
 
         function downloadFile(fileId) {
-            alert(`กำลังดาวน์โหลดไฟล์ ID: ${fileId}`);
+            // alert(`กำลังดาวน์โหลดไฟล์ ID: ${fileId}`);
+            window.open('openfile.php?file_id=' + encodeURIComponent(fileId), '_blank');
         }
 
         function getCategoryName(category) {
