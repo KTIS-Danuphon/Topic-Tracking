@@ -60,7 +60,7 @@ $count_notification = $result_notification[0]['count_notification'];
             <a href="notifications.php" class="menu-link <?= $currentPage == 'notifications.php' ? 'active' : '' ?>">
                 <i class="bi bi-bell"></i>
                 <span>แจ้งเตือน</span>
-                <?= ($count_notification ?? 0) == 0 ? '' : '<span class="menu-badge">' . $count_notification . '</span>' ?>
+                <span id="badgeUnread_menu" class="menu-badge"><?= ($count_notification ?? 0) == 0 ? '' : $count_notification ?></span>
             </a>
         </li>
         <!-- <li class="menu-item">
@@ -87,7 +87,7 @@ $count_notification = $result_notification[0]['count_notification'];
         <li class="menu-item">
             <a href="categories.php" class="menu-link <?= $currentPage == 'categories.php' ? 'active' : '' ?>">
                 <i class="bi bi-tags"></i>
-                <span>จัดการฝ่าย</span>
+                <span>จัดการแผนก</span>
             </a>
         </li>
 

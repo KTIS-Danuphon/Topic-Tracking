@@ -13,14 +13,14 @@ $now = new DateTime();
 $formatted_now = $now->format('Y-m-d H:i:s');
 
 $table = 'tb_notifications_c050968 nt';
-$fields = 'nt.fd_notification_id, nt.fd_task_id, nt.fd_title, nt.fd_message, nt.fd_icontype, nt.fd_created_at, ntu.fd_is_read  ';
+$fields = 'nt.fd_notification_id, nt.fd_task_id, nt.fd_title, nt.fd_message, nt.fd_icontype, nt.fd_created_at, ntu.fd_is_read, ntu.fd_user_id  ';
 $where = 'LEFT JOIN tb_notification_users_c050968 ntu ON ntu.fd_notification_id = nt.fd_notification_id ';
 $where .= 'WHERE nt.fd_is_deleted = "0" AND ntu.fd_user_id = "' . $_SESSION['user_id'] . '" AND ntu.fd_is_deleted = "0" ';
 $where .= 'ORDER BY nt.fd_created_at DESC ';
 $result_notification = $object->ReadData($table, $fields, $where);
 $notification = [];
 
-function timeAgoTH($datetime)//ฟังก์ชันแปลงเวลาเป็นข้อความภาษาไทย
+function timeAgoTH($datetime) //ฟังก์ชันแปลงเวลาเป็นข้อความภาษาไทย
 {
     $tz   = new DateTimeZone('Asia/Bangkok');
     $now  = new DateTime('now', $tz);
@@ -46,9 +46,18 @@ function timeAgoTH($datetime)//ฟังก์ชันแปลงเวลา�
 
     // ---------- มากกว่า 7 วัน ----------
     $thaiMonths = [
-        1 => 'ม.ค', 2 => 'ก.พ', 3 => 'มี.ค', 4 => 'เม.ย',
-        5 => 'พ.ค', 6 => 'มิ.ย', 7 => 'ก.ค', 8 => 'ส.ค',
-        9 => 'ก.ย', 10 => 'ต.ค', 11 => 'พ.ย', 12 => 'ธ.ค'
+        1 => 'ม.ค',
+        2 => 'ก.พ',
+        3 => 'มี.ค',
+        4 => 'เม.ย',
+        5 => 'พ.ค',
+        6 => 'มิ.ย',
+        7 => 'ก.ค',
+        8 => 'ส.ค',
+        9 => 'ก.ย',
+        10 => 'ต.ค',
+        11 => 'พ.ย',
+        12 => 'ธ.ค'
     ];
 
     $day   = $time->format('d');
@@ -73,13 +82,14 @@ foreach ($result_notification as $row) {
             break;
     }
     $notification[] = [
-        'id' =>  $row['fd_notification_id'], //id แจ้งเตือน
+        'id' =>  $Encrypt->EnCrypt_pass($row['fd_notification_id']), //id แจ้งเตือน
         'type' => $row['fd_icontype'], //ประเภทแจ้งเตือน
         'title' => $row['fd_title'], //หัวข้อแจ้งเตือน
         'message' => $row['fd_message'], //ข้อความแจ้งเตือน
         'time' => timeAgoTH($row['fd_created_at']), //เวลาที่แจ้งเตือน
         'isRead' =>  $is_read, //สถานะการอ่าน
         'taskId' => $row['fd_task_id'], //id งานที่เกี่ยวข้อง
+        'encrypt_userid' => $Encrypt->EnCrypt_pass($row['fd_user_id']),
         'encrypt_id' => $Encrypt->EnCrypt_pass($row['fd_task_id']), //เข้ารหัส id งาน
     ];
 }
@@ -827,17 +837,17 @@ foreach ($result_notification as $row) {
         }
 
         @media (max-width: 576px) {
-             .unread-badge {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: #ef4444;
-            color: white;
-            font-size: 0.65rem;
-            padding: 0.25rem 0.5rem;
-            border-radius: 10px;
-            font-weight: 600;
-        }
+            .unread-badge {
+                position: absolute;
+                top: 1rem;
+                right: 1rem;
+                background: #ef4444;
+                color: white;
+                font-size: 0.65rem;
+                padding: 0.25rem 0.5rem;
+                border-radius: 10px;
+                font-weight: 600;
+            }
 
             .notification-item {
                 flex-direction: row;
@@ -1153,7 +1163,7 @@ foreach ($result_notification as $row) {
 
             const html = notificationsToShow.map(notification => `
                 <div class="notification-item ${!notification.isRead ? 'unread' : ''}" 
-                     onclick="handleNotificationClick(${notification.id})">
+                     onclick="handleNotificationClick('${notification.id}')">
                     ${!notification.isRead ? '<span class="unread-badge">ใหม่</span>' : ''}
                     <div class="notification-icon ${notification.type}">
                         <i class="bi ${getIconClass(notification.type)}"></i>
@@ -1169,11 +1179,11 @@ foreach ($result_notification as $row) {
                         ${notification.taskId ? `
                             <div class="notification-actions-btn">
                                 <button class="btn btn-sm btn-primary btn-notification" 
-                                        onclick="event.stopPropagation(); viewTask('${notification.encrypt_id}')">
+                                        onclick="event.stopPropagation(); readNotificationTask('${notification.encrypt_id}')">
                                     <i class="bi bi-eye me-1"></i>ดูรายละเอียด
                                 </button>
                                 <button class="btn btn-sm btn-outline-secondary btn-notification" 
-                                        onclick="event.stopPropagation(); markAsRead(${notification.id})">
+                                        onclick="event.stopPropagation(); markAsRead('${notification.id}')">
                                     <i class="bi bi-check me-1"></i>ทำเครื่องหมายว่าอ่าน
                                 </button>
                             </div>
@@ -1257,14 +1267,26 @@ foreach ($result_notification as $row) {
             markAsRead(id);
         }
 
-        function viewTask(taskId) {
-            window.location.href = `task_detail.php?taskID=${taskId}`; //ไปยังหน้ารายละเอียดงาน
+        function readNotificationTask(taskId) {
+            //  window.location.href = `task_detail.php?taskID=${taskId}`; //ไปยังหน้ารายละเอียดงาน
+            window.location.href = `notification_read.php?taskID=${taskId}`; //ไปยังหน้าอ่านแจ้งเตอรายละเอียดงาน
         }
 
         function updateBadges() {
             document.getElementById('badgeAll').textContent = allNotifications.length;
             document.getElementById('badgeUnread').textContent =
                 allNotifications.filter(n => !n.isRead).length;
+            const badge = document.getElementById('badgeUnread_menu'); //
+            const unreadCount = allNotifications.filter(n => !n.isRead).length;
+
+            if (unreadCount === 0) {
+                badge.textContent = '';
+                badge.classList.remove('menu-badge');
+            } else {
+                badge.textContent = unreadCount;
+                badge.classList.add('menu-badge');
+            }
+
             document.getElementById('badgeTask').textContent =
                 allNotifications.filter(n => n.type === 'task').length;
             document.getElementById('badgeComment').textContent =
