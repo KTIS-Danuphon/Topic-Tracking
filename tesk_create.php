@@ -811,17 +811,17 @@ foreach ($result_user as $row) {
 
                         <div class="col-md-4 mb-3">
                             <label class="form-label">
-                                หมวดหมู่ <span class="text-danger">ไม่บังคับ</span>
+                                หมวดหมู่ <span class="text-danger">*</span>
                             </label>
-                            <!-- <select class="form-select" id="taskCategory" name="taskCategory" required>
-                                <option value="">เลือกหมวดหมู่</option>
-                                <option value="development">พัฒนาระบบ</option>
-                                <option value="design">ออกแบบ</option>
-                                <option value="marketing">การตลาด</option>
-                                <option value="meeting">ประชุม</option>
-                                <option value="other">อื่นๆ</option>
-                            </select> -->
-                            <input type="text" class="form-control" id="taskCategory" name="taskCategory" placeholder="ระบุชื่อหมวดหมู่">
+                            <select class="form-select" id="taskCategory" name="taskCategory" required>
+                                <option value="" selected disabled>เลือกหมวดหมู่</option>
+                                <option value="เรื่องประชุม">เรื่องประชุม</option>
+                                <option value="โครงการ">โครงการ</option>
+                                <option value="ปัญหา">ปัญหา</option>
+                                <option value="แผนงาน">แผนงาน</option>
+                                <option value="อื่นๆ">อื่นๆ</option>
+                            </select>
+                            <!-- <input type="text" class="form-control" id="taskCategory" name="taskCategory" placeholder="ระบุชื่อหมวดหมู่"> -->
                         </div>
                     </div>
 
@@ -959,10 +959,10 @@ foreach ($result_user as $row) {
                         ยกเลิก
                     </button>
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-outline-primary" onclick="saveDraft()">
+                        <!-- <button type="button" class="btn btn-outline-primary" onclick="saveDraft()">
                             <i class="bi bi-save me-2"></i>
                             บันทึกแบบร่าง
-                        </button>
+                        </button> -->
                         <button type="submit" class="btn-submit">
                             <i class="bi bi-check-circle me-2"></i>
                             สร้างงาน
