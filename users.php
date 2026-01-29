@@ -1,4 +1,80 @@
-<?php include 'session_check.php'; ?>
+<?php
+include 'session_check.php';
+date_default_timezone_set('Asia/Bangkok');
+
+require_once 'class/crud.class.php';
+require_once 'class/util.class.php';
+require_once 'class/encrypt.class.php';
+
+$object   = new CRUD();
+$util     = new Util();
+$Encrypt  = new Encrypt_data();
+$now = new DateTime();
+$formatted_now = $now->format('Y-m-d H:i:s');
+
+//ข้อมูลฝ่าย
+$table = 'tb_departments_c050968';
+$fields = 'fd_dept_id, fd_dept_name';
+$where = 'WHERE fd_dept_active = "1"';
+$result_department = $object->ReadData($table, $fields, $where);
+
+// ดึงข้อมูลผู้ใช้ที่ login
+$table = 'tb_users_c050968 u';
+$fields = 'fd_user_id, fd_user_name, fd_user_fullname, fd_user_status, fd_user_dept, fd_user_active';
+$where = 'WHERE fd_user_id = "' . $_SESSION['user_id'] . '" AND fd_user_active = "1"';
+$result_current = $object->ReadData($table, $fields, $where);
+
+if (!$result_current || count($result_current) === 0) {
+    header("Location: auth_login.php");
+    exit();
+}
+
+$current_user = $result_current[0];
+$current_user_id = $current_user['fd_user_id'];
+$current_user_role = $current_user['fd_user_status'];
+
+// ดึงข้อมูลผู้ใช้ทั้งหมด
+$fields = 'u.fd_user_id, u.fd_user_name, u.fd_user_fullname, u.fd_user_status, dm.fd_dept_name, u.fd_user_active, u.fd_user_created_at, u.fd_user_updated_at';
+$where = 'LEFT JOIN tb_departments_c050968 dm ON dm.fd_dept_id = u.fd_user_dept ';
+if ($current_user_role === 'admin') {
+    // Admin เห็นทุกคน
+    $where .= 'ORDER BY fd_user_created_at DESC';
+} else {
+    // User เห็นแค่ตัวเอง
+    $where .= 'WHERE fd_user_id = ' . $current_user_id;
+}
+
+$result_user = $object->ReadData($table, $fields, $where);
+
+// นับสถิติสำหรับ Admin
+$stats = [
+    'admin' => 0,
+    'user' => 0,
+    'executive' => 0,
+    'active' => 0,
+    'inactive' => 0
+];
+
+if ($current_user_role === 'admin' && $result_user) {
+    foreach ($result_user as $row) {
+        // นับตามสิทธิ์
+        if ($row['fd_user_status'] === 'admin') {
+            $stats['admin']++;
+        } elseif ($row['fd_user_status'] === 'executive') {
+            $stats['executive']++;
+        } else {
+            $stats['user']++;
+        }
+
+        // นับตามสถานะ
+        if ($row['fd_user_active'] == '1') {
+            $stats['active']++;
+        } else {
+            $stats['inactive']++;
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="th">
 
@@ -6,6 +82,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>จัดการผู้ใช้ - Topic Tracking</title>
+    <link rel="icon" href="ktis.svg" type="image/svg+xml">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
@@ -283,12 +360,10 @@
         }
 
         /* Responsive */
-        /* //!มือถือ */
         @media (max-width: 576px) {
             .main-content {
                 margin-left: 0;
                 padding: 1rem;
-                /* overflow-x: hidden; */
             }
 
             .main-content .container-fluid {
@@ -511,14 +586,6 @@
             word-break: break-all;
         }
 
-        .text-truncate-custom {
-            max-width: 120px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            display: inline-block;
-        }
-
         .pagination-container {
             background: white;
             border-radius: 0 0 16px 16px;
@@ -662,19 +729,13 @@
 
         @media (max-width: 992px) {
 
-            .user-table thead th:nth-child(2),
-            .user-table tbody td:nth-child(2) {
+            .user-table thead th:nth-child(4),
+            .user-table tbody td:nth-child(4) {
                 display: none;
             }
         }
 
         @media (max-width: 768px) {
-
-            .user-table thead th:nth-child(4),
-            .user-table tbody td:nth-child(4) {
-                display: none;
-            }
-
             .user-table-container {
                 overflow-x: auto;
             }
@@ -712,26 +773,6 @@
             border-color: var(--primary-color);
             box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
         }
-
-        .alert-info-custom {
-            background: #e0e7ff;
-            border: 1px solid #c7d2fe;
-            color: #4338ca;
-            border-radius: 12px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        @media (max-width: 768px) {
-            .user-header {
-                flex-direction: column;
-                text-align: center;
-            }
-
-            .user-details {
-                grid-template-columns: 1fr;
-            }
-        }
     </style>
 </head>
 
@@ -745,50 +786,54 @@
                     <i class="bi bi-people me-2" style="color: var(--primary-color);"></i>
                     จัดการผู้ใช้
                 </h1>
-                <p class="text-muted" id="pageDescription">จัดการข้อมูลผู้ใช้ในระบบ</p>
+                <p class="text-muted" id="pageDescription">
+                    <?php echo ($current_user_role === 'admin') ? 'จัดการข้อมูลผู้ใช้ทั้งหมดในระบบ' : 'จัดการข้อมูลส่วนตัวของคุณ'; ?>
+                </p>
             </div>
 
-            <!-- Stats -->
-            <div class="stats-card" id="statsSection">
-                <div class="row">
-                    <div class="col-md-3 col-6">
-                        <div class="stat-item">
-                            <div class="stat-icon admin">
-                                <i class="bi bi-shield-check"></i>
+            <!-- Stats (Admin Only) -->
+            <?php if ($current_user_role === 'admin'): ?>
+                <div class="stats-card" id="statsSection">
+                    <div class="row">
+                        <div class="col-md-3 col-6">
+                            <div class="stat-item">
+                                <div class="stat-icon admin">
+                                    <i class="bi bi-shield-check"></i>
+                                </div>
+                                <div class="stat-number"><?php echo $stats['admin']; ?></div>
+                                <div class="stat-label">ผู้ดูแลระบบ</div>
                             </div>
-                            <div class="stat-number" id="adminCount">3</div>
-                            <div class="stat-label">ผู้ดูแลระบบ</div>
                         </div>
-                    </div>
-                    <div class="col-md-3 col-6">
-                        <div class="stat-item">
-                            <div class="stat-icon user">
-                                <i class="bi bi-person"></i>
+                        <div class="col-md-3 col-6">
+                            <div class="stat-item">
+                                <div class="stat-icon user">
+                                    <i class="bi bi-person"></i>
+                                </div>
+                                <div class="stat-number"><?php echo $stats['user']; ?></div>
+                                <div class="stat-label">ผู้ใช้ทั่วไป</div>
                             </div>
-                            <div class="stat-number" id="userCount">12</div>
-                            <div class="stat-label">ผู้ใช้ทั่วไป</div>
                         </div>
-                    </div>
-                    <div class="col-md-3 col-6">
-                        <div class="stat-item">
-                            <div class="stat-icon active">
-                                <i class="bi bi-check-circle"></i>
+                        <div class="col-md-3 col-6">
+                            <div class="stat-item">
+                                <div class="stat-icon active">
+                                    <i class="bi bi-check-circle"></i>
+                                </div>
+                                <div class="stat-number"><?php echo $stats['active']; ?></div>
+                                <div class="stat-label">ใช้งานอยู่</div>
                             </div>
-                            <div class="stat-number" id="activeCount">13</div>
-                            <div class="stat-label">ใช้งานอยู่</div>
                         </div>
-                    </div>
-                    <div class="col-md-3 col-6">
-                        <div class="stat-item">
-                            <div class="stat-icon inactive">
-                                <i class="bi bi-x-circle"></i>
+                        <div class="col-md-3 col-6">
+                            <div class="stat-item">
+                                <div class="stat-icon inactive">
+                                    <i class="bi bi-x-circle"></i>
+                                </div>
+                                <div class="stat-number"><?php echo $stats['inactive']; ?></div>
+                                <div class="stat-label">ไม่ใช้งาน</div>
                             </div>
-                            <div class="stat-number" id="inactiveCount">2</div>
-                            <div class="stat-label">ไม่ใช้งาน</div>
                         </div>
                     </div>
                 </div>
-            </div>
+            <?php endif; ?>
 
             <!-- Search Bar -->
             <div class="search-bar">
@@ -796,31 +841,36 @@
                     <div class="col-md-6">
                         <label class="form-label">ค้นหาผู้ใช้</label>
                         <input type="text" class="form-control" id="searchInput"
-                            placeholder="ค้นหาด้วยชื่อ, อีเมล...">
+                            placeholder="ค้นหาด้วยชื่อผู้ใช้, ชื่อ-นามสกุล...">
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label">สิทธิ์</label>
-                        <select class="form-select" id="roleFilter">
-                            <option value="">ทั้งหมด</option>
-                            <option value="admin">ผู้ดูแลระบบ</option>
-                            <option value="user">ผู้ใช้ทั่วไป</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">สถานะ</label>
-                        <select class="form-select" id="statusFilter">
-                            <option value="">ทั้งหมด</option>
-                            <option value="active">ใช้งานอยู่</option>
-                            <option value="inactive">ไม่ใช้งาน</option>
-                        </select>
-                    </div>
+                    <?php if ($current_user_role === 'admin'): ?>
+                        <div class="col-md-3">
+                            <label class="form-label">สิทธิ์</label>
+                            <select class="form-select" id="roleFilter">
+                                <option value="">ทั้งหมด</option>
+                                <option value="admin">ผู้ดูแลระบบ</option>
+                                <option value="user">ผู้ใช้ทั่วไป</option>
+                                <option value="executive">ผู้บริหาร</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">สถานะ</label>
+                            <select class="form-select" id="statusFilter">
+                                <option value="">ทั้งหมด</option>
+                                <option value="1">ใช้งานอยู่</option>
+                                <option value="0">ไม่ใช้งาน</option>
+                            </select>
+                        </div>
+                    <?php endif; ?>
                 </div>
-                <div class="mt-3" id="adminActions" style="display: none;">
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                        <i class="bi bi-plus-circle me-2"></i>
-                        เพิ่มผู้ใช้ใหม่
-                    </button>
-                </div>
+                <?php if ($current_user_role === 'admin'): ?>
+                    <div class="mt-3">
+                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+                            <i class="bi bi-plus-circle me-2"></i>
+                            เพิ่มผู้ใช้ใหม่
+                        </button>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <!-- User List -->
@@ -829,10 +879,8 @@
                     <table class="table user-table" style="min-width: 1200px;">
                         <thead>
                             <tr>
-                                <!-- <th style="width: 80px;">Avatar</th> -->
+                                <th style="width: 200px;">ชื่อผู้ใช้</th>
                                 <th style="width: 200px;">ชื่อ-นามสกุล</th>
-                                <th style="width: 220px;">อีเมล</th>
-                                <th style="width: 130px;">เบอร์โทร</th>
                                 <th style="width: 180px;">แผนก/ตำแหน่ง</th>
                                 <th style="width: 110px;">สิทธิ์</th>
                                 <th style="width: 110px;">สถานะ</th>
@@ -871,7 +919,6 @@
                 </div>
             </div>
 
-
             <!-- Edit User Modal -->
             <div class="modal fade" id="editUserModal" tabindex="-1">
                 <div class="modal-dialog modal-lg">
@@ -889,53 +936,48 @@
 
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
+                                        <label class="form-label">ชื่อผู้ใช้ <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="editUsername" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
                                         <label class="form-label">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="editName" required>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">อีเมล <span class="text-danger">*</span></label>
-                                        <input type="email" class="form-control" id="editEmail" required>
-                                    </div>
-                                </div>
-
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">เบอร์โทรศัพท์</label>
-                                        <input type="tel" class="form-control" id="editPhone">
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">แผนก/ตำแหน่ง</label>
-                                        <input type="text" class="form-control" id="editDepartment">
-                                    </div>
-                                </div>
-
-                                <div class="row" id="adminEditFields" style="display: none;">
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">สิทธิ์การใช้งาน</label>
-                                        <select class="form-select" id="editRole">
-                                            <option value="user">ผู้ใช้ทั่วไป</option>
-                                            <option value="admin">ผู้ดูแลระบบ</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">สถานะ</label>
-                                        <select class="form-select" id="editStatus">
-                                            <option value="active">ใช้งานอยู่</option>
-                                            <option value="inactive">ไม่ใช้งาน</option>
-                                        </select>
+                                        <input type="text" class="form-control" id="editFullname" required>
                                     </div>
                                 </div>
 
                                 <div class="mb-3">
+                                    <label class="form-label">แผนก/ตำแหน่ง</label>
+                                    <input type="text" class="form-control" id="editDepartment">
+                                </div>
+
+                                <?php if ($current_user_role === 'admin'): ?>
+                                    <div class="row" id="adminEditFields">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">สิทธิ์การใช้งาน</label>
+                                            <select class="form-select" id="editRole">
+                                                <option value="user">ผู้ใช้ทั่วไป</option>
+                                                <option value="admin">ผู้ดูแลระบบ</option>
+                                                <option value="executive">ผู้บริหาร</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">สถานะ</label>
+                                            <select class="form-select" id="editStatus">
+                                                <option value="1">ใช้งานอยู่</option>
+                                                <option value="0">ไม่ใช้งาน</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+
+                                <div class="mb-3">
                                     <label class="form-label">รหัสผ่านใหม่ (เว้นว่างหากไม่ต้องการเปลี่ยน)</label>
-                                    <input type="password" class="form-control" id="editPassword"
-                                        placeholder="••••••••">
+                                    <input type="password" class="form-control" id="editPassword" placeholder="••••••••">
                                 </div>
 
                                 <div class="mb-3">
                                     <label class="form-label">ยืนยันรหัสผ่านใหม่</label>
-                                    <input type="password" class="form-control" id="editPasswordConfirm"
-                                        placeholder="••••••••">
+                                    <input type="password" class="form-control" id="editPasswordConfirm" placeholder="••••••••">
                                 </div>
                             </form>
                         </div>
@@ -950,338 +992,120 @@
                     </div>
                 </div>
             </div>
-    </main>
 
-    <!-- Add User Modal (Admin Only) -->
-    <div class="modal fade" id="addUserModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">
-                        <i class="bi bi-person-plus me-2"></i>
-                        เพิ่มผู้ใช้ใหม่
-                    </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <!-- Add User Modal (Admin Only) -->
+            <?php if ($current_user_role === 'admin'): ?>
+                <div class="modal fade" id="addUserModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    <i class="bi bi-person-plus me-2"></i>
+                                    เพิ่มผู้ใช้ใหม่
+                                </h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form id="addUserForm">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">ชื่อผู้ใช้ <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="addUsername" required>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="addFullname" required>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">แผนก</label>
+                                        <!-- <input type="text" class="form-control" id="addDepartment"> -->
+                                        <select class="form-select" id="addDepartment">
+                                            <option value="" selected disabled>-- เลือกแผนก --</option>
+                                            <?php
+                                            foreach ($result_department as $row) {
+                                                echo '<option value="' . $row['fd_dept_id'] . '">' . $row['fd_dept_name'] . '</option>';
+                                            }
+                                            ?>
+                                        </select>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">สิทธิ์การใช้งาน</label>
+                                            <select class="form-select" id="addRole">
+                                                <option value="user">ผู้ใช้ทั่วไป</option>
+                                                <option value="admin">ผู้ดูแลระบบ</option>
+                                                <option value="executive">ผู้บริหาร</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">สถานะ</label>
+                                            <select class="form-select" id="addStatus">
+                                                <option value="1">ใช้งานอยู่</option>
+                                                <option value="0">ไม่ใช้งาน</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">รหัสผ่าน <span class="text-danger">*</span></label>
+                                            <input type="password" class="form-control" id="addPassword" value="Ktisgroup" required>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">ยืนยันรหัสผ่าน <span class="text-danger">*</span></label>
+                                            <input type="password" class="form-control" id="addPasswordConfirm" required>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <i class="bi bi-x-circle me-1"></i>ยกเลิก
+                                </button>
+                                <button type="button" class="btn btn-primary" onclick="addUser()">
+                                    <i class="bi bi-check-circle me-1"></i>เพิ่มผู้ใช้
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="modal-body">
-                    <form id="addUserForm">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="addName" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">อีเมล <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" id="addEmail" required>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">เบอร์โทรศัพท์</label>
-                                <input type="tel" class="form-control" id="addPhone">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">แผนก/ตำแหน่ง</label>
-                                <input type="text" class="form-control" id="addDepartment">
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">สิทธิ์การใช้งาน</label>
-                                <select class="form-select" id="addRole">
-                                    <option value="user">ผู้ใช้ทั่วไป</option>
-                                    <option value="admin">ผู้ดูแลระบบ</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">สถานะ</label>
-                                <select class="form-select" id="addStatus">
-                                    <option value="active">ใช้งานอยู่</option>
-                                    <option value="inactive">ไม่ใช้งาน</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">รหัสผ่าน <span class="text-danger">*</span></label>
-                                <input type="password" class="form-control" id="addPassword" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">ยืนยันรหัสผ่าน <span class="text-danger">*</span></label>
-                                <input type="password" class="form-control" id="addPasswordConfirm" required>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="bi bi-x-circle me-1"></i>ยกเลิก
-                    </button>
-                    <button type="button" class="btn btn-primary" onclick="addUser()">
-                        <i class="bi bi-check-circle me-1"></i>เพิ่มผู้ใช้
-                    </button>
-                </div>
-            </div>
+            <?php endif; ?>
         </div>
-    </div>
+    </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Sidebar Toggle
-        function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebarOverlay');
-            sidebar.classList.toggle('show');
-            overlay.classList.toggle('show');
-        }
-
-        // Notifications
-        function showNotifications() {
-            alert('แจ้งเตือนทั้งหมด:\n\n- งานใหม่ถูกมอบหมายให้คุณ\n- มีความคิดเห็นใหม่ในงาน\n- งานใกล้ครบกำหนด 3 งาน');
-        }
-
-        // User Menu
-        function toggleUserMenu() {
-            alert('เมนูผู้ใช้:\n- โปรไฟล์\n- ตั้งค่า\n- ออกจากระบบ');
-        }
-
-        // Logout
-        function logout() {
-            if (confirm('คุณต้องการออกจากระบบหรือไม่?')) {
-                window.location.href = 'logout.php';
-            }
-        }
-
-        // Close sidebar when clicking on menu item (mobile)
-        document.querySelectorAll('.menu-link').forEach(link => {
-            link.addEventListener('click', function() {
-                if (window.innerWidth <= 992) {
-                    toggleSidebar();
-                }
-            });
-        });
-    </script>
-    <script>
-        // Mock current user (เปลี่ยนได้ตามระบบจริง)
+        // Current user from PHP
         const currentUser = {
-            id: 2,
-            role: 'admin' // 'admin' หรือ 'user'
+            id: <?php echo $current_user_id; ?>,
+            role: '<?php echo $current_user_role; ?>'
         };
 
-        // Mock users data (เพิ่มข้อมูลให้เยอะขึ้น)
-        let users = [{
-                id: 1,
-                name: 'สมชาย ใจดี',
-                email: 'somchai@example.com',
-                phone: '081-234-5678',
-                department: 'Developer',
-                role: 'executive',
-                status: 'active',
-                lastLogin: '2024-12-24 10:30:00',
-                createdAt: '2024-01-15'
-            },
-            {
-                id: 2,
-                name: 'สมหญิง สวยงามมากเป็นพิเศษ',
-                email: 'somying.swayngam.super.long.email@example.com',
-                phone: '082-345-6789',
-                department: 'UI/UX Designer & Frontend Developer',
-                role: 'user',
-                status: 'active',
-                lastLogin: '2024-12-23 15:20:00',
-                createdAt: '2024-02-20'
-            },
-            {
-                id: 3,
-                name: 'วิชัย รักงาน',
-                email: 'wichai@example.com',
-                phone: '083-456-7890',
-                department: 'Project Manager',
-                role: 'admin',
-                status: 'active',
-                lastLogin: '2024-12-24 09:15:00',
-                createdAt: '2024-01-10'
-            },
-            {
-                id: 4,
-                name: 'มานี มีเงิน',
-                email: 'manee@example.com',
-                phone: '084-567-8901',
-                department: 'Marketing',
-                role: 'user',
-                status: 'active',
-                lastLogin: '2024-12-22 14:45:00',
-                createdAt: '2024-03-05'
-            },
-            {
-                id: 5,
-                name: 'ประเสริฐ ดีเด่น',
-                email: 'prasert@example.com',
-                phone: '085-678-9012',
-                department: 'Developer',
-                role: 'user',
-                status: 'inactive',
-                lastLogin: '2024-11-15 10:00:00',
-                createdAt: '2024-02-28'
-            },
-            {
-                id: 6,
-                name: 'จิตรา แสงจันทร์',
-                email: 'jitra@example.com',
-                phone: '086-789-0123',
-                department: 'HR Manager',
-                role: 'user',
-                status: 'active',
-                lastLogin: '2024-12-24 08:30:00',
-                createdAt: '2024-03-15'
-            },
-            {
-                id: 7,
-                name: 'ธนากร เจริญสุข',
-                email: 'thanakorn@example.com',
-                phone: '087-890-1234',
-                department: 'Sales',
-                role: 'user',
-                status: 'active',
-                lastLogin: '2024-12-23 16:00:00',
-                createdAt: '2024-04-01'
-            },
-            {
-                id: 8,
-                name: 'นภัสวรรณ์ ศรีสุขใจดีมากที่สุดในโลก',
-                email: 'napasawan.very.long.name.test@example.co.th',
-                phone: '088-901-2345',
-                department: 'Senior Backend Developer & System Architect',
-                role: 'admin',
-                status: 'active',
-                lastLogin: '2024-12-24 11:00:00',
-                createdAt: '2024-01-20'
-            },
-            {
-                id: 9,
-                name: 'อภิชาติ วรรณกุล',
-                email: 'apichat@example.com',
-                phone: '089-012-3456',
-                department: 'QA Tester',
-                role: 'user',
-                status: 'inactive',
-                lastLogin: '2024-10-20 09:00:00',
-                createdAt: '2024-05-10'
-            },
-            {
-                id: 10,
-                name: 'ศิริพร สมบูรณ์',
-                email: 'siriporn@example.com',
-                phone: '090-123-4567',
-                department: 'Content Writer',
-                role: 'user',
-                status: 'active',
-                lastLogin: '2024-12-23 13:30:00',
-                createdAt: '2024-06-01'
-            },
-            {
-                id: 11,
-                name: 'ชัยวัฒน์ มั่งคั่ง',
-                email: 'chaiwat@example.com',
-                phone: '091-234-5678',
-                department: 'Financial Analyst',
-                role: 'user',
-                status: 'active',
-                lastLogin: '2024-12-24 07:45:00',
-                createdAt: '2024-07-15'
-            },
-            {
-                id: 12,
-                name: 'พิมพ์ใจ รักษ์สุข',
-                email: 'pimjai@example.com',
-                phone: '092-345-6789',
-                department: 'Graphic Designer',
-                role: 'user',
-                status: 'active',
-                lastLogin: '2024-12-22 10:20:00',
-                createdAt: '2024-08-01'
-            },
-            {
-                id: 13,
-                name: 'ธีรพงษ์ ยิ้มแย้ม',
-                email: 'teerapong@example.com',
-                phone: '093-456-7890',
-                department: 'System Administrator',
-                role: 'admin',
-                status: 'active',
-                lastLogin: '2024-12-24 06:00:00',
-                createdAt: '2024-02-01'
-            },
-            {
-                id: 14,
-                name: 'สุดารัตน์ เพชรกลาง',
-                email: 'sudarat@example.com',
-                phone: '094-567-8901',
-                department: 'Legal Advisor',
-                role: 'user',
-                status: 'active',
-                lastLogin: '2024-12-23 12:00:00',
-                createdAt: '2024-09-01'
-            },
-            {
-                id: 15,
-                name: 'วัชรพล แข็งแรง',
-                email: 'watcharapon@example.com',
-                phone: '095-678-9012',
-                department: 'DevOps Engineer',
-                role: 'user',
-                status: 'active',
-                lastLogin: '2024-12-24 05:30:00',
-                createdAt: '2024-10-01'
-            }
-        ];
+        // Users data from database
+        let users = <?php echo json_encode($result_user ? $result_user : []); ?>;
 
         let currentPage = 1;
         let itemsPerPage = 10;
         let filteredUsers = [];
 
         function initializePage() {
-            if (currentUser.role === 'admin') {
-                // Admin เห็นทุกคน
-                document.getElementById('pageDescription').textContent = 'จัดการข้อมูลผู้ใช้ทั้งหมดในระบบ';
-                document.getElementById('adminActions').style.display = 'block';
-                document.getElementById('statsSection').style.display = 'block';
-            } else {
-                // User เห็นแค่ตัวเอง
-                document.getElementById('pageDescription').textContent = 'จัดการข้อมูลส่วนตัวของคุณ';
-                document.getElementById('adminActions').style.display = 'none';
-                document.getElementById('statsSection').style.display = 'none';
-                users = users.filter(u => u.id === currentUser.id);
-            }
-
-            updateStats();
             renderUsers();
-        }
-
-        function updateStats() {
-            if (currentUser.role !== 'admin') return;
-
-            const allUsers = users;
-            document.getElementById('adminCount').textContent = allUsers.filter(u => u.role === 'admin').length;
-            document.getElementById('userCount').textContent = allUsers.filter(u => u.role === 'user').length;
-            document.getElementById('activeCount').textContent = allUsers.filter(u => u.status === 'active').length;
-            document.getElementById('inactiveCount').textContent = allUsers.filter(u => u.status === 'inactive').length;
         }
 
         function renderUsers() {
             const tbody = document.getElementById('userList');
             const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            const roleFilter = document.getElementById('roleFilter').value;
-            const statusFilter = document.getElementById('statusFilter').value;
+            const roleFilter = document.getElementById('roleFilter') ? document.getElementById('roleFilter').value : '';
+            const statusFilter = document.getElementById('statusFilter') ? document.getElementById('statusFilter').value : '';
 
             filteredUsers = users.filter(user => {
-                const matchSearch = user.name.toLowerCase().includes(searchTerm) ||
-                    user.email.toLowerCase().includes(searchTerm);
-                const matchRole = !roleFilter || user.role === roleFilter;
-                const matchStatus = !statusFilter || user.status === statusFilter;
+                const matchSearch = user.fd_user_fullname.toLowerCase().includes(searchTerm) ||
+                    user.fd_user_name.toLowerCase().includes(searchTerm);
+                const matchRole = !roleFilter || user.fd_user_status === roleFilter;
+                const matchStatus = !statusFilter || user.fd_user_active == statusFilter;
 
                 return matchSearch && matchRole && matchStatus;
             });
@@ -1295,7 +1119,7 @@
             if (usersToShow.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="empty-state">
+                        <td colspan="6" class="empty-state">
                             <i class="bi bi-person-x"></i>
                             <p class="mt-3">ไม่พบผู้ใช้</p>
                         </td>
@@ -1307,73 +1131,93 @@
 
             document.querySelector('.pagination-container').style.display = 'flex';
 
-            // <td><div class="table-avatar" title="${user.name}">${user.name.charAt(0)}</div></td>
-            tbody.innerHTML = usersToShow.map(user => `
-                <tr class="${user.id === currentUser.id ? 'current-user' : ''}">
-                    <td>
-                        <div class="user-name-cell" title="${user.name}">
-                            ${user.name}
-                            ${user.id === currentUser.id ? '<span class="you-badge">คุณ</span>' : ''}
-                        </div>
-                    </td>
-                    <td>
-                        <div class="user-email-cell" title="${user.email}">${user.email}</div>
-                    </td>
-                    <td class="phone-cell">
-                        <span class="text-muted" title="${user.phone || '-'}">${user.phone || '-'}</span>
-                    </td>
-                    <td class="department-cell">
-                        <span class="text-muted" title="${user.department || '-'}">${user.department || '-'}</span>
-                    </td>
-                    <td>
-                        <span class="badge-role ${user.role}">
-                            <i class="bi bi-${
-                                user.role === 'admin'
-                                    ? 'shield-check'
-                                    : user.role === 'executive'
-                                    ? 'briefcase-fill'
-                                    : 'person'
-                            }"></i>
-                            ${
-                                user.role === 'admin'
-                                    ? 'Admin'
-                                    : user.role === 'executive'
-                                    ? 'Executive'
-                                    : 'User'
-                            }
-                        </span>
-                    </td>
+            tbody.innerHTML = usersToShow.map(user => {
+                const isCurrentUser = user.fd_user_id == currentUser.id;
+                const roleLabel = getRoleLabel(user.fd_user_status);
+                const statusLabel = user.fd_user_active == '1' ? 'ใช้งาน' : 'ไม่ใช้งาน';
+                const statusClass = user.fd_user_active == '1' ? 'active' : 'inactive';
 
-                    <td>
-                        <span class="badge-status ${user.status}">
-                            <i class="bi bi-circle-fill"></i>
-                            ${user.status === 'active' ? 'ใช้งาน' : 'ไม่ใช้งาน'}
-                        </span>
-                    </td>
-                    <td>
-                        <div class="action-btn-group">
-                            ${canEdit(user.id) ? `
-                                <button class="btn btn-sm btn-primary btn-action-sm" onclick="editUser(${user.id})" title="แก้ไข">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                            ` : ''}
-                            ${canDelete(user.id) ? `
-                                <button class="btn btn-sm btn-outline-danger btn-action-sm" onclick="deleteUser(${user.id})" title="ลบ">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            ` : ''}
-                            ${canResetPassword(user.id) && currentUser.role === 'admin' ? `
-                                <button class="btn btn-sm btn-outline-warning btn-action-sm" onclick="resetPassword(${user.id})" title="รีเซ็ตรหัสผ่าน">
-                                    <i class="bi bi-key"></i>
-                                </button>
-                            ` : ''}
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
+                return `
+                    <tr class="${isCurrentUser ? 'current-user' : ''}">
+                        <td>
+                            <div class="user-name-cell" title="${user.fd_user_name}">
+                                ${user.fd_user_name}
+                                ${isCurrentUser ? '<span class="you-badge">คุณ</span>' : ''}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="user-email-cell" title="${user.fd_user_fullname}">${user.fd_user_fullname}</div>
+                        </td>
+                        <td class="department-cell">
+                            <span class="text-muted" title="${user.fd_dept_name || '-'}">${user.fd_dept_name || '-'}</span>
+                        </td>
+                        <td>
+                            <span class="badge-role ${user.fd_user_status}">
+                                <i class="bi bi-${getRoleIcon(user.fd_user_status)}"></i>
+                                ${roleLabel}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge-status ${statusClass}">
+                                <i class="bi bi-circle-fill"></i>
+                                ${statusLabel}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="action-btn-group">
+                                ${canEdit(user.fd_user_id) ? `
+                                    <button class="btn btn-sm btn-primary btn-action-sm" onclick="editUser(${user.fd_user_id})" title="แก้ไข">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                ` : ''}
+                                ${canDelete(user.fd_user_id) ? `
+                                    <button class="btn btn-sm btn-outline-danger btn-action-sm" onclick="deleteUser(${user.fd_user_id})" title="ลบ">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                ` : ''}
+                                ${canResetPassword(user.fd_user_id) ? `
+                                    <button class="btn btn-sm btn-outline-warning btn-action-sm" onclick="resetPassword(${user.fd_user_id})" title="รีเซ็ตรหัสผ่าน">
+                                        <i class="bi bi-key"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
 
             updatePaginationInfo();
             renderPagination();
+        }
+
+        function getRoleLabel(role) {
+            const roles = {
+                'admin': 'Admin',
+                'user': 'User',
+                'executive': 'Executive'
+            };
+            return roles[role] || role;
+        }
+
+        function getRoleIcon(role) {
+            const icons = {
+                'admin': 'shield-check',
+                'user': 'person',
+                'executive': 'briefcase-fill'
+            };
+            return icons[role] || 'person';
+        }
+
+        function canEdit(userId) {
+            return currentUser.role === 'admin' || userId == currentUser.id;
+        }
+
+        function canDelete(userId) {
+            return currentUser.role === 'admin' && userId != currentUser.id;
+        }
+
+        function canResetPassword(userId) {
+            return currentUser.role === 'admin';
         }
 
         function updatePaginationInfo() {
@@ -1388,6 +1232,11 @@
         function renderPagination() {
             const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
             const paginationControls = document.getElementById('paginationControls');
+
+            if (totalPages <= 1) {
+                paginationControls.innerHTML = '';
+                return;
+            }
 
             let html = '';
 
@@ -1441,7 +1290,7 @@
 
             // Next button
             html += `
-                <li class="page-item ${currentPage === totalPages || totalPages === 0 ? 'disabled' : ''}">
+                <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
                     <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">
                         <i class="bi bi-chevron-right"></i>
                     </a>
@@ -1468,51 +1317,29 @@
             renderUsers();
         }
 
-        function canEdit(userId) {
-            // Admin แก้ไขได้ทุกคน, User แก้ไขได้แค่ตัวเอง
-            return currentUser.role === 'admin' || userId === currentUser.id;
-        }
-
-        function canDelete(userId) {
-            // Admin ลบได้ แต่ลบตัวเองไม่ได้
-            return currentUser.role === 'admin' && userId !== currentUser.id;
-        }
-
-        function canResetPassword(userId) {
-            // Admin รีเซ็ตได้ทุกคน
-            return currentUser.role === 'admin';
-        }
-
         function editUser(userId) {
-            const user = users.find(u => u.id === userId);
+            const user = users.find(u => u.fd_user_id == userId);
             if (!user) return;
 
-            document.getElementById('editUserId').value = user.id;
-            document.getElementById('editName').value = user.name;
-            document.getElementById('editEmail').value = user.email;
-            document.getElementById('editPhone').value = user.phone || '';
-            document.getElementById('editDepartment').value = user.department || '';
-            document.getElementById('editRole').value = user.role;
-            document.getElementById('editStatus').value = user.status;
+            document.getElementById('editUserId').value = user.fd_user_id;
+            document.getElementById('editUsername').value = user.fd_user_name;
+            document.getElementById('editFullname').value = user.fd_user_fullname;
+            document.getElementById('editDepartment').value = user.fd_dept_name || '';
+
+            <?php if ($current_user_role === 'admin'): ?>
+                document.getElementById('editRole').value = user.fd_user_status;
+                document.getElementById('editStatus').value = user.fd_user_active;
+            <?php endif; ?>
+
             document.getElementById('editPassword').value = '';
             document.getElementById('editPasswordConfirm').value = '';
-
-            // Admin เห็นฟิลด์เพิ่มเติม
-            if (currentUser.role === 'admin') {
-                document.getElementById('adminEditFields').style.display = 'flex';
-            } else {
-                document.getElementById('adminEditFields').style.display = 'none';
-            }
 
             const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
             modal.show();
         }
 
         function saveUser() {
-            const userId = parseInt(document.getElementById('editUserId').value);
-            const user = users.find(u => u.id === userId);
-            if (!user) return;
-
+            const userId = document.getElementById('editUserId').value;
             const password = document.getElementById('editPassword').value;
             const passwordConfirm = document.getElementById('editPasswordConfirm').value;
 
@@ -1521,110 +1348,96 @@
                 return;
             }
 
-            user.name = document.getElementById('editName').value;
-            user.email = document.getElementById('editEmail').value;
-            user.phone = document.getElementById('editPhone').value;
-            user.department = document.getElementById('editDepartment').value;
+            // ส่งข้อมูลไป API
+            const formData = {
+                action: 'update',
+                user_id: userId,
+                username: document.getElementById('editUsername').value,
+                fullname: document.getElementById('editFullname').value,
+                department: document.getElementById('editDepartment').value,
+                password: password
+            };
 
-            if (currentUser.role === 'admin') {
-                user.role = document.getElementById('editRole').value;
-                user.status = document.getElementById('editStatus').value;
-            }
+            <?php if ($current_user_role === 'admin'): ?>
+                formData.role = document.getElementById('editRole').value;
+                formData.status = document.getElementById('editStatus').value;
+            <?php endif; ?>
 
-            // ในการใช้งานจริง ส่งข้อมูลไป API
-            console.log('Saving user:', user);
+            // TODO: ส่งไป API
+            console.log('Saving user:', formData);
 
             bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
-            updateStats();
-            renderUsers();
-            alert('บันทึกข้อมูลสำเร็จ');
+            alert('บันทึกข้อมูลสำเร็จ (ต้องเชื่อมต่อ API)');
         }
 
-        function addUser() {
-            const password = document.getElementById('addPassword').value;
-            const passwordConfirm = document.getElementById('addPasswordConfirm').value;
+        <?php if ($current_user_role === 'admin'): ?>
 
-            if (password !== passwordConfirm) {
-                alert('รหัสผ่านไม่ตรงกัน');
-                return;
+            function addUser() {
+                const password = document.getElementById('addPassword').value;
+                const passwordConfirm = document.getElementById('addPasswordConfirm').value;
+
+                if (password !== passwordConfirm) {
+                    alert('รหัสผ่านไม่ตรงกัน');
+                    return;
+                }
+
+                const formData = {
+                    action: 'create',
+                    username: document.getElementById('addUsername').value,
+                    fullname: document.getElementById('addFullname').value,
+                    department: document.getElementById('addDepartment').value,
+                    role: document.getElementById('addRole').value,
+                    status: document.getElementById('addStatus').value,
+                    password: password
+                };
+
+                // TODO: ส่งไป API
+                console.log('Adding user:', formData);
+
+                bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+                document.getElementById('addUserForm').reset();
+                alert('เพิ่มผู้ใช้สำเร็จ (ต้องเชื่อมต่อ API)');
             }
 
-            const newUser = {
-                id: users.length + 1,
-                name: document.getElementById('addName').value,
-                email: document.getElementById('addEmail').value,
-                phone: document.getElementById('addPhone').value,
-                department: document.getElementById('addDepartment').value,
-                role: document.getElementById('addRole').value,
-                status: document.getElementById('addStatus').value,
-                lastLogin: new Date().toISOString(),
-                createdAt: new Date().toISOString().split('T')[0]
-            };
+            function deleteUser(userId) {
+                const user = users.find(u => u.fd_user_id == userId);
+                if (!user) return;
 
-            users.push(newUser);
-
-            // ในการใช้งานจริง ส่งข้อมูลไป API
-            console.log('Adding user:', newUser);
-
-            bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
-            document.getElementById('addUserForm').reset();
-            updateStats();
-            renderUsers();
-            alert('เพิ่มผู้ใช้สำเร็จ');
-        }
-
-        function deleteUser(userId) {
-            const user = users.find(u => u.id === userId);
-            if (!user) return;
-
-            if (confirm(`คุณต้องการลบผู้ใช้ "${user.name}" หรือไม่?`)) {
-                users = users.filter(u => u.id !== userId);
-
-                // ในการใช้งานจริง ส่งข้อมูลไป API
-                console.log('Deleting user:', userId);
-
-                updateStats();
-                renderUsers();
-                alert('ลบผู้ใช้สำเร็จ');
+                if (confirm(`คุณต้องการลบผู้ใช้ "${user.fd_user_fullname}" หรือไม่?`)) {
+                    // TODO: ส่งไป API
+                    console.log('Deleting user:', userId);
+                    alert('ลบผู้ใช้สำเร็จ (ต้องเชื่อมต่อ API)');
+                }
             }
-        }
 
-        function resetPassword(userId) {
-            const user = users.find(u => u.id === userId);
-            if (!user) return;
+            function resetPassword(userId) {
+                const user = users.find(u => u.fd_user_id == userId);
+                if (!user) return;
 
-            if (confirm(`รีเซ็ตรหัสผ่านของ "${user.name}" หรือไม่?\n\nรหัสผ่านใหม่จะถูกส่งไปยังอีเมล ${user.email}`)) {
-                // ในการใช้งานจริง ส่งข้อมูลไป API
-                console.log('Resetting password for user:', userId);
-                alert('รีเซ็ตรหัสผ่านสำเร็จ\nรหัสผ่านใหม่ถูกส่งไปยังอีเมลแล้ว');
+                if (confirm(`รีเซ็ตรหัสผ่านของ "${user.fd_user_fullname}" หรือไม่?\n\nรหัสผ่านใหม่จะเป็น: 123456`)) {
+                    // TODO: ส่งไป API
+                    console.log('Resetting password for user:', userId);
+                    alert('รีเซ็ตรหัสผ่านสำเร็จ (ต้องเชื่อมต่อ API)');
+                }
             }
-        }
-
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            const options = {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            };
-            return date.toLocaleDateString('th-TH', options);
-        }
+        <?php endif; ?>
 
         // Search and Filter
         document.getElementById('searchInput').addEventListener('input', function() {
             currentPage = 1;
             renderUsers();
         });
-        document.getElementById('roleFilter').addEventListener('change', function() {
-            currentPage = 1;
-            renderUsers();
-        });
-        document.getElementById('statusFilter').addEventListener('change', function() {
-            currentPage = 1;
-            renderUsers();
-        });
+
+        <?php if ($current_user_role === 'admin'): ?>
+            document.getElementById('roleFilter').addEventListener('change', function() {
+                currentPage = 1;
+                renderUsers();
+            });
+            document.getElementById('statusFilter').addEventListener('change', function() {
+                currentPage = 1;
+                renderUsers();
+            });
+        <?php endif; ?>
 
         // Initialize
         document.addEventListener('DOMContentLoaded', initializePage);
