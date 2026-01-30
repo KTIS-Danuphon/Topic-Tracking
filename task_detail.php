@@ -27,7 +27,7 @@ switch ($_SESSION['user_status']) {
     case 'executive':
         $where = 'WHERE fd_topic_active = "1"   ';
         break;
-    //user → เห็นเฉพาะคนอื่นในแผนกเดียวกัน มีสถานะเป็น user และ active
+    //user → เห็นเฉพาะคนอื่นในฝ่ายเดียวกัน มีสถานะเป็น user และ active
     case 'user':
     default:
         $userId = (int) $_SESSION['user_id'];
@@ -60,8 +60,8 @@ $result_topic = $object->ReadData($table, $fields, $where);
 $result_participant = trim($result_topic[0]['fd_topic_participant'], '[]'); // ลบ [] ออก
 
 $table = 'tb_users_c050968 user';
-$fields = 'user.fd_user_id, user.fd_user_fullname, dept.fd_dept_name ';
-$where = 'LEFT JOIN tb_departments_c050968 dept ON dept.fd_dept_id = user.fd_user_dept ';
+$fields = 'user.fd_user_id, user.fd_user_fullname, dvsfd_div_name ';
+$where = 'LEFT JOIN tb_divisions_c050968 dvs ON dvsfd_div_id = user.fd_user_div ';
 if (empty($result_participant)) {
     $where .= 'WHERE user.fd_user_id  IN (' .  0 . ') AND user.fd_user_active = "1" ';
 } else {
@@ -1063,7 +1063,7 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
                         <div class="user-avatar">${member.avatar}</div>
                         <div class="user-selection-item">
                             <div class="user-name">${member.fd_user_fullname}</div>
-                            <div class="user-role">${member.fd_dept_name}</div>
+                            <div class="user-role">${member.fd_div_name}</div>
                         </div>
                     </div>
                 `).join('');

@@ -13,18 +13,18 @@ $now = new DateTime();
 $formatted_now = $now->format('Y-m-d H:i:s');
 
 $table = 'tb_users_c050968 user';
-$fields = 'user.fd_user_id, user.fd_user_fullname, user.fd_user_status, dept.fd_dept_name';
-$where = 'LEFT JOIN tb_departments_c050968 dept ON user.fd_user_dept = dept.fd_dept_id ';
+$fields = 'user.fd_user_id, user.fd_user_fullname, user.fd_user_status, dvs.fd_div_name';
+$where = 'LEFT JOIN tb_divisions_c050968 dvs ON user.fd_user_div = dvs.fd_div_id ';
 switch ($_SESSION['user_status']) {
     //admin / executive → เห็น user ทุกคน
     case 'admin':
     case 'executive':
         $where .= 'WHERE user.fd_user_status = "user" AND user.fd_user_active = "1"';
         break;
-    //user → เห็นเฉพาะคนอื่นในแผนกเดียวกัน มีสถานะเป็น user และ active
+    //user → เห็นเฉพาะคนอื่นในฝ่ายเดียวกัน มีสถานะเป็น user และ active
     case 'user':
     default:
-        $where .= 'WHERE user.fd_user_id != "' . $_SESSION['user_id'] . '" AND user.fd_user_status = "user" AND user.fd_user_dept = "' . $_SESSION['user_dept'] . '" AND user.fd_user_active = "1"';
+        $where .= 'WHERE user.fd_user_id != "' . $_SESSION['user_id'] . '" AND user.fd_user_status = "user" AND user.fd_user_div = "' . $_SESSION['user_div'] . '" AND user.fd_user_active = "1"';
         break;
 }
 $result_user = $object->ReadData($table, $fields, $where);
@@ -43,7 +43,7 @@ foreach ($result_user as $row) {
     $users[] = [
         'id'     => $row['fd_user_id'],
         'name'   => $fullname,
-        'role'   => $row['fd_dept_name'], // ชื่อฝ่ายงาน
+        'role'   => $row['fd_div_name'], // ชื่อฝ่ายงาน
         'avatar' => $avatar
     ];
 }

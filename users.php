@@ -13,14 +13,14 @@ $now = new DateTime();
 $formatted_now = $now->format('Y-m-d H:i:s');
 
 //ข้อมูลฝ่าย
-$table = 'tb_departments_c050968';
-$fields = 'fd_dept_id, fd_dept_name';
-$where = 'WHERE fd_dept_active = "1"';
-$result_department = $object->ReadData($table, $fields, $where);
+$table = 'tb_divisions_c050968';
+$fields = 'fd_div_id, fd_div_name';
+$where = 'WHERE fd_div_active = "1"';
+$result_division = $object->ReadData($table, $fields, $where);
 
 // ดึงข้อมูลผู้ใช้ที่ login
 $table = 'tb_users_c050968 u';
-$fields = 'fd_user_id, fd_user_name, fd_user_fullname, fd_user_status, fd_user_dept, fd_user_active';
+$fields = 'fd_user_id, fd_user_name, fd_user_fullname, fd_user_status, fd_user_div, fd_user_active';
 $where = 'WHERE fd_user_id = "' . $_SESSION['user_id'] . '" AND fd_user_active = "1"';
 $result_current = $object->ReadData($table, $fields, $where);
 
@@ -34,8 +34,8 @@ $current_user_id = $current_user['fd_user_id'];
 $current_user_role = $current_user['fd_user_status'];
 
 // ดึงข้อมูลผู้ใช้ทั้งหมด
-$fields = 'u.fd_user_id, u.fd_user_name, u.fd_user_fullname, u.fd_user_status, dm.fd_dept_name, u.fd_user_active, u.fd_user_created_at, u.fd_user_updated_at';
-$where = 'LEFT JOIN tb_departments_c050968 dm ON dm.fd_dept_id = u.fd_user_dept ';
+$fields = 'u.fd_user_id, u.fd_user_name, u.fd_user_fullname, u.fd_user_status, dm.fd_div_name, u.fd_user_active, u.fd_user_created_at, u.fd_user_updated_at';
+$where = 'LEFT JOIN tb_divisions_c050968 dm ON dm.fd_div_id = u.fd_user_div ';
 if ($current_user_role === 'admin') {
     // Admin เห็นทุกคน
     $where .= 'ORDER BY fd_user_created_at DESC';
@@ -881,7 +881,7 @@ if ($current_user_role === 'admin' && $result_user) {
                             <tr>
                                 <th style="width: 200px;">ชื่อผู้ใช้</th>
                                 <th style="width: 200px;">ชื่อ-นามสกุล</th>
-                                <th style="width: 180px;">แผนก/ตำแหน่ง</th>
+                                <th style="width: 180px;">ฝ่าย/ตำแหน่ง</th>
                                 <th style="width: 110px;">สิทธิ์</th>
                                 <th style="width: 110px;">สถานะ</th>
                                 <th style="width: 140px;" class="text-center">จัดการ</th>
@@ -946,8 +946,8 @@ if ($current_user_role === 'admin' && $result_user) {
                                 </div>
 
                                 <div class="mb-3">
-                                    <label class="form-label">แผนก/ตำแหน่ง</label>
-                                    <input type="text" class="form-control" id="editDepartment">
+                                    <label class="form-label">ฝ่าย/ตำแหน่ง</label>
+                                    <input type="text" class="form-control" id="editdivision">
                                 </div>
 
                                 <?php if ($current_user_role === 'admin'): ?>
@@ -1019,13 +1019,13 @@ if ($current_user_role === 'admin' && $result_user) {
                                     </div>
 
                                     <div class="mb-3">
-                                        <label class="form-label">แผนก</label>
-                                        <!-- <input type="text" class="form-control" id="addDepartment"> -->
-                                        <select class="form-select" id="addDepartment">
-                                            <option value="" selected disabled>-- เลือกแผนก --</option>
+                                        <label class="form-label">ฝ่าย</label>
+                                        <!-- <input type="text" class="form-control" id="adddivision"> -->
+                                        <select class="form-select" id="adddivision">
+                                            <option value="" selected disabled>-- เลือกฝ่าย --</option>
                                             <?php
-                                            foreach ($result_department as $row) {
-                                                echo '<option value="' . $row['fd_dept_id'] . '">' . $row['fd_dept_name'] . '</option>';
+                                            foreach ($result_division as $row) {
+                                                echo '<option value="' . $row['fd_div_id'] . '">' . $row['fd_div_name'] . '</option>';
                                             }
                                             ?>
                                         </select>
@@ -1148,8 +1148,8 @@ if ($current_user_role === 'admin' && $result_user) {
                         <td>
                             <div class="user-email-cell" title="${user.fd_user_fullname}">${user.fd_user_fullname}</div>
                         </td>
-                        <td class="department-cell">
-                            <span class="text-muted" title="${user.fd_dept_name || '-'}">${user.fd_dept_name || '-'}</span>
+                        <td class="division-cell">
+                            <span class="text-muted" title="${user.fd_div_name || '-'}">${user.fd_div_name || '-'}</span>
                         </td>
                         <td>
                             <span class="badge-role ${user.fd_user_status}">
@@ -1324,7 +1324,7 @@ if ($current_user_role === 'admin' && $result_user) {
             document.getElementById('editUserId').value = user.fd_user_id;
             document.getElementById('editUsername').value = user.fd_user_name;
             document.getElementById('editFullname').value = user.fd_user_fullname;
-            document.getElementById('editDepartment').value = user.fd_dept_name || '';
+            document.getElementById('editdivision').value = user.fd_div_name || '';
 
             <?php if ($current_user_role === 'admin'): ?>
                 document.getElementById('editRole').value = user.fd_user_status;
@@ -1354,7 +1354,7 @@ if ($current_user_role === 'admin' && $result_user) {
                 user_id: userId,
                 username: document.getElementById('editUsername').value,
                 fullname: document.getElementById('editFullname').value,
-                department: document.getElementById('editDepartment').value,
+                division: document.getElementById('editdivision').value,
                 password: password
             };
 
@@ -1385,7 +1385,7 @@ if ($current_user_role === 'admin' && $result_user) {
                     action: 'create',
                     username: document.getElementById('addUsername').value,
                     fullname: document.getElementById('addFullname').value,
-                    department: document.getElementById('addDepartment').value,
+                    division: document.getElementById('adddivision').value,
                     role: document.getElementById('addRole').value,
                     status: document.getElementById('addStatus').value,
                     password: password

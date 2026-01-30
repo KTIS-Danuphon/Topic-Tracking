@@ -27,7 +27,7 @@ switch ($_SESSION['user_status']) {
     case 'executive':
         $where = 'WHERE fd_topic_active = "1"   ';
         break;
-    //user → เห็นเฉพาะคนอื่นในแผนกเดียวกัน มีสถานะเป็น user และ active
+    //user → เห็นเฉพาะคนอื่นในฝ่ายเดียวกัน มีสถานะเป็น user และ active
     case 'user':
     default:
         $userId = (int) $_SESSION['user_id'];
@@ -60,18 +60,18 @@ $result_topic = $object->ReadData($table, $fields, $where);
 $result_participant = trim($result_topic[0]['fd_topic_participant'], '[]'); // ลบ [] ออก
 
 $table = 'tb_users_c050968 user';
-$fields = 'user.fd_user_id, user.fd_user_fullname, dept.fd_dept_name ';
-$where = 'LEFT JOIN tb_departments_c050968 dept ON dept.fd_dept_id = user.fd_user_dept ';
+$fields = 'user.fd_user_id, user.fd_user_fullname, dvsfd_div_name ';
+$where = 'LEFT JOIN tb_divisions_c050968 dvs ON dvsfd_div_id = user.fd_user_div ';
 switch ($_SESSION['user_status']) {
     //admin / executive → เห็น user ทุกคน
     case 'admin':
     case 'executive':
         $where .= 'WHERE user.fd_user_status = "user" AND user.fd_user_active = "1"';
         break;
-    //user → เห็นเฉพาะคนอื่นในแผนกเดียวกัน มีสถานะเป็น user และ active
+    //user → เห็นเฉพาะคนอื่นในฝ่ายเดียวกัน มีสถานะเป็น user และ active
     case 'user':
     default:
-        $where .= 'WHERE user.fd_user_status = "user" AND user.fd_user_dept = "' . $_SESSION['user_dept'] . '" AND user.fd_user_active = "1"';
+        $where .= 'WHERE user.fd_user_status = "user" AND user.fd_user_div = "' . $_SESSION['user_div'] . '" AND user.fd_user_active = "1"';
         break;
 }
 $result_user = $object->ReadData($table, $fields, $where);
@@ -143,7 +143,7 @@ foreach ($result_user as $row) {
     $users[] = [
         'id'     => $row['fd_user_id'],
         'name'   => $fullname,
-        'role'   => $row['fd_dept_name'],
+        'role'   => $row['fd_div_name'],
         'avatar' => $avatar
     ];
 }
@@ -988,19 +988,19 @@ foreach ($result_user as $row) {
                                 placeholder="ระบุชื่อหัวข้องาน..." required>
                         </div>
 
-                        <div class="col-md-4 mb-3">
+                         <div class="col-md-4 mb-3">
                             <label class="form-label">
-                                หมวดหมู่ <span class="text-danger">ไม่บังคับ</span>
+                                หมวดหมู่ <span class="text-danger">*</span>
                             </label>
-                            <!-- <select class="form-select" id="taskCategory" name="taskCategory" required>
-                                <option value="">เลือกหมวดหมู่</option>
-                                <option value="development">พัฒนาระบบ</option>
-                                <option value="design">ออกแบบ</option>
-                                <option value="marketing">การตลาด</option>
-                                <option value="meeting">ประชุม</option>
-                                <option value="other">อื่นๆ</option>
-                            </select> -->
-                            <input type="text" class="form-control" id="taskCategory" name="taskCategory" placeholder="ระบุชื่อหมวดหมู่">
+                            <select class="form-select" id="taskCategory" name="taskCategory" required>
+                                <option value="" disabled>เลือกหมวดหมู่</option>
+                                <option value="เรื่องประชุม">เรื่องประชุม</option>
+                                <option value="โครงการ">โครงการ</option>
+                                <option value="ปัญหา">ปัญหา</option>
+                                <option value="แผนงาน">แผนงาน</option>
+                                <option value="อื่นๆ">อื่นๆ</option>
+                            </select>
+                            <!-- <input type="text" class="form-control" id="taskCategory" name="taskCategory" placeholder="ระบุชื่อหมวดหมู่"> -->
                         </div>
                     </div>
 

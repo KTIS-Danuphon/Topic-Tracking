@@ -87,7 +87,7 @@ $count_notification = $result_notification[0]['count_notification'];
         <li class="menu-item">
             <a href="categories.php" class="menu-link <?= $currentPage == 'categories.php' ? 'active' : '' ?>">
                 <i class="bi bi-tags"></i>
-                <span>จัดการแผนก</span>
+                <span>จัดการฝ่าย</span>
             </a>
         </li>
 

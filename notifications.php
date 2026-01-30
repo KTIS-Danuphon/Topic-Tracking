@@ -1059,7 +1059,7 @@ foreach ($result_notification as $row) {
         //         id: 8,
         //         type: 'mention',
         //         title: 'ถูกแท็กในงานใหม่',
-        //         message: '@คุณ ถูกแท็กในงาน "วางแผนการตลาดออนไลน์"',
+        //         message: '@คุณ ถูกแท็กในงาน "วางฝ่ายารตลาดออนไลน์"',
         //         time: '1 วันที่แล้ว',
         //         isRead: false,
         //         taskId: 'stu901'

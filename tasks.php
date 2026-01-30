@@ -20,7 +20,7 @@ switch ($_SESSION['user_status']) {
     case 'executive':
         $where = 'WHERE fd_topic_active = "1"   ';
         break;
-    //user → เห็นเฉพาะคนอื่นในแผนกเดียวกัน มีสถานะเป็น user และ active
+    //user → เห็นเฉพาะคนอื่นในฝ่ายเดียวกัน มีสถานะเป็น user และ active
     case 'user':
     default:
         $userId = (int) $_SESSION['user_id'];
