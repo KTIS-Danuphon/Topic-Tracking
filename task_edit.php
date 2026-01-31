@@ -60,8 +60,8 @@ $result_topic = $object->ReadData($table, $fields, $where);
 $result_participant = trim($result_topic[0]['fd_topic_participant'], '[]'); // ลบ [] ออก
 
 $table = 'tb_users_c050968 user';
-$fields = 'user.fd_user_id, user.fd_user_fullname, dvsfd_div_name ';
-$where = 'LEFT JOIN tb_divisions_c050968 dvs ON dvsfd_div_id = user.fd_user_div ';
+$fields = 'user.fd_user_id, user.fd_user_fullname, dvs.fd_div_name ';
+$where = 'LEFT JOIN tb_divisions_c050968 dvs ON dvs.fd_div_id = user.fd_user_div ';
 switch ($_SESSION['user_status']) {
     //admin / executive → เห็น user ทุกคน
     case 'admin':

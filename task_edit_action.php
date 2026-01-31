@@ -72,9 +72,9 @@ try {
     $category     = $_POST['taskCategory'] ?? null;
     $description  = $_POST['taskDescription'] ?? '';
     $status       = $_POST['taskStatus'] ?? '';
-    $due_date     = $_POST['taskDueDate'] ?? null;
+    $due_date     = ($_POST['taskDueDate'] ?? null) === '0000-00-00' ? null : ($_POST['taskDueDate'] ?? null);
     $importance   = $_POST['taskImportance'] ?? null;
-    $createdBy = $_SESSION['user_id'] ?? null; // ผู้สร้างรายการ
+    $createdBy    = $_SESSION['user_id'] ?? null; // ผู้สร้างรายการ
     $mentionedUsers   = $_POST['mentionedUsers'] ?? '';
     $additionalUsers  = $_POST['additionalUsers'] ?? '';
     $deleteFiles      = $_POST['filesToDelete'];
@@ -94,7 +94,7 @@ try {
         'fd_topic_status'      => $_POST['taskStatus'] ?? '',
         'fd_topic_participant' => $additionalUsers,
         'fd_topic_importance'  => $_POST['taskImportance'] ?? '',
-        'fd_topic_due_date'    => $_POST['taskDueDate'] ?? null
+        'fd_topic_due_date'    => ($_POST['taskDueDate'] ?? null) === '0000-00-00' ? null : ($_POST['taskDueDate'] ?? null)
     ];
 
     //เปรียบเทียบข้อมูลเดิมกับข้อมูลใหม่
@@ -172,7 +172,7 @@ try {
             $textLog = 'file';
         }
     }
-    
+
     try {
         //มีการแก้ไขข้อมูล
         if ($edit_data) {
