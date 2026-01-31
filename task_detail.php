@@ -60,8 +60,8 @@ $result_topic = $object->ReadData($table, $fields, $where);
 $result_participant = trim($result_topic[0]['fd_topic_participant'], '[]'); // ลบ [] ออก
 
 $table = 'tb_users_c050968 user';
-$fields = 'user.fd_user_id, user.fd_user_fullname, dvsfd_div_name ';
-$where = 'LEFT JOIN tb_divisions_c050968 dvs ON dvsfd_div_id = user.fd_user_div ';
+$fields = 'user.fd_user_id, user.fd_user_fullname, dvs.fd_div_name ';
+$where = 'LEFT JOIN tb_divisions_c050968 dvs ON dvs.fd_div_id = user.fd_user_div ';
 if (empty($result_participant)) {
     $where .= 'WHERE user.fd_user_id  IN (' .  0 . ') AND user.fd_user_active = "1" ';
 } else {
@@ -85,6 +85,12 @@ $table = 'tb_topic_files_c050968';
 $fields = 'fd_file_id, fd_file_original_name , fd_file_path, fd_file_size, fd_file_type ';
 $where = 'WHERE fd_file_task_id = "' . $TaskID . '" AND fd_file_active = "1" ';
 $result_files = $object->ReadData($table, $fields, $where);
+
+$table = 'tb_comment_c050968 cm';
+$fields = 'cm.fd_comment_id, u.fd_user_name, cm.fd_comment_text, cm.fd_time_create ';
+$where = 'LEFT JOIN tb_users_c050968 u ON u.fd_user_id = cm.fd_user_id ';
+$where .= 'WHERE cm.fd_task_id = "' . $TaskID . '" AND cm.fd_comment_active = "1" ';
+$result_comment = $object->ReadData($table, $fields, $where);
 
 $table = 'tb_topic_log_c050968';
 $fields = 'fd_topic_log_id, fd_topic_log_type, fd_topic_log_text, fd_topic_log_time ';
@@ -117,10 +123,40 @@ if (is_array($result_files)) {
 
 $taskData['files'] = $result_files;
 
-$taskData['allComments'] = []; // ดึงความคิดเห็นจากฐานข้อมูลถ้ามี
+$taskData['allComments'] = [];
+
+if (!empty($result_comment)) {
+    foreach ($result_comment as $row) {
+
+        // สร้าง avatar จากอักษรย่อ (เช่น ชื่อ + นามสกุล)
+        $nameParts = explode(' ', trim($row['fd_user_name']));
+        $avatar = '';
+        foreach ($nameParts as $part) {
+            $avatar .= mb_substr($part, 0, 1, 'UTF-8');
+        }
+
+        $taskData['allComments'][] = [
+            'id' => (int)$row['fd_comment_id'],
+            'author' => [
+                'name' => $row['fd_user_name'],
+                'avatar' => $avatar
+            ],
+            'content' => $row['fd_comment_text'],
+            'created_at' => $row['fd_time_create']
+        ];
+    }
+} // ดึงความคิดเห็น
 
 $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจากฐานข้อมูลถ้ามี
 
+$fullname = $_SESSION['user_fullname'];
+$nameParts = explode(' ', $fullname);
+
+$avatar = '';
+foreach ($nameParts as $p) {
+    $avatar .= mb_substr($p, 0, 1); //ตัวแรกของชื่อและสกุล
+}
+$_SESSION['user_avatar'] = $avatar;
 
 // ดึงกิจกรรมจากฐานข้อมูลถ้ามี
 
@@ -136,9 +172,7 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
     <?php include 'style_menu.php'; ?>
-
     <style>
         .detail-card {
             background: white;
@@ -305,6 +339,14 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
         .file-meta {
             font-size: 0.85rem;
             color: #64748b;
+        }
+
+        .btn-download.btn-view {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+
+        .btn-download.btn-view:hover {
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
         }
 
         .btn-download {
@@ -784,6 +826,98 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
     <script>
         // Mock task data with more comments and activities
         const taskData = <?= json_encode($taskData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT); ?>;
+        // const 
+        //         taskData.allComments = [{
+        //                 id: 1,
+        //                 author: {
+        //                     name: 'ดนุพล พื้นสันเทียะ',
+        //                     avatar: 'ดพ'
+        //                 },
+        //                 content: 'เริ่มทำ mockup เรียบร้อยแล้วครับ รอ review',
+        //                 created_at: '2025-12-21 09:15:00'
+        //             },
+        //             {
+        //                 id: 2,
+        //                 author: {
+        //                     name: 'วิชัย รักงาน',
+        //                     avatar: 'WR'
+        //                 },
+        //                 content: 'ดูดีมากครับ ขอเพิ่ม feature forgot password ด้วยนะครับ',
+        //                 created_at: '2024-12-21 14:30:00'
+        //             },
+        //             {
+        //                 id: 3,
+        //                 author: {
+        //                     name: 'สมหญิง สวยงาม',
+        //                     avatar: 'SS'
+        //                 },
+        //                 content: 'ผมเพิ่ม UI สำหรับ forgot password แล้วครับ',
+        //                 created_at: '2024-12-21 16:45:00'
+        //             },
+        //             {
+        //                 id: 4,
+        //                 author: {
+        //                     name: 'สมชาย ใจดี',
+        //                     avatar: 'SC'
+        //                 },
+        //                 content: 'OAuth Google ทำงานได้แล้วครับ กำลังทดสอบ Facebook',
+        //                 created_at: '2024-12-22 10:20:00'
+        //             },
+        //             {
+        //                 id: 5,
+        //                 author: {
+        //                     name: 'วิชัย รักงาน',
+        //                     avatar: 'WR'
+        //                 },
+        //                 content: 'ดีมากครับ ขอให้ทดสอบ edge cases ด้วยนะครับ',
+        //                 created_at: '2024-12-22 11:30:00'
+        //             },
+        //             {
+        //                 id: 6,
+        //                 author: {
+        //                     name: 'สมหญิง สวยงาม',
+        //                     avatar: 'SS'
+        //                 },
+        //                 content: 'พบ bug ตอน login ด้วย Facebook บนมือถือครับ',
+        //                 created_at: '2024-12-22 14:15:00'
+        //             },
+        //             {
+        //                 id: 7,
+        //                 author: {
+        //                     name: 'สมชาย ใจดี',
+        //                     avatar: 'SC'
+        //                 },
+        //                 content: 'แก้ bug Facebook login เรียบร้อยแล้วครับ',
+        //                 created_at: '2024-12-22 16:30:00'
+        //             },
+        //             {
+        //                 id: 8,
+        //                 author: {
+        //                     name: 'วิชัย รักงาน',
+        //                     avatar: 'WR'
+        //                 },
+        //                 content: 'ขอให้เพิ่ม unit test ด้วยครับ',
+        //                 created_at: '2024-12-23 09:00:00'
+        //             },
+        //             {
+        //                 id: 9,
+        //                 author: {
+        //                     name: 'สมชาย ใจดี',
+        //                     avatar: 'SC'
+        //                 },
+        //                 content: 'เพิ่ม unit test ครบทุก function แล้วครับ coverage 95%',
+        //                 created_at: '2024-12-23 14:20:00'
+        //             },
+        //             {
+        //                 id: 10,
+        //                 author: {
+        //                     name: 'วิชัย รักงาน',
+        //                     avatar: 'WR'
+        //                 },
+        //                 content: 'เยี่ยมมากครับ พร้อม deploy แล้ว',
+        //                 created_at: '2024-12-23 15:45:00'
+        //             }
+        //         ];
         // const taskData = {
         //     id: 1,
         //     title: "พัฒนาระบบ Login ใหม่",
@@ -831,6 +965,7 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
         //             type: 'image/png'
         //         }
         //     ],
+
         //     allComments: [{
         //             id: 1,
         //             author: {
@@ -1032,7 +1167,11 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
                 </span>
                 <span class="meta-item">
                     <i class="bi bi-flag-fill"></i>
-                    ${formatDate(taskData.due_date)}
+                    ${
+                        !taskData.due_date || taskData.due_date === '0000-00-00'
+                            ? 'ยังไม่มีวันครบกำหนด'
+                            : formatDate(taskData.due_date)
+                    }
                 </span>
             `;
             document.getElementById('taskMeta').innerHTML = metaHtml;
@@ -1086,9 +1225,14 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
                             <div class="file-name">${file.fd_file_original_name}</div>
                             <div class="file-meta">${formatFileSize(file.fd_file_size)}</div>
                         </div>
-                        <button class="btn-download" onclick="downloadFile('${file.fd_file_id}')">
-                            <i class="bi bi-download"></i>
-                        </button>
+                        <div class="d-flex gap-2">
+                            <button class="btn-download" onclick="viewFile('${file.fd_file_id}')" title="แสดงไฟล์">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn-download" onclick="downloadFile('${file.fd_file_id}')" title="ดาวน์โหลด">
+                                <i class="bi bi-download"></i>
+                            </button>
+                        </div>
                     </div>
                 `).join('');
                 document.getElementById('filesList').innerHTML = filesHtml;
@@ -1154,7 +1298,7 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
             loadComments();
         }
 
-        function addComment() {
+        function addComment2() {
             const commentInput = document.getElementById('commentInput');
             const content = commentInput.value.trim();
 
@@ -1166,8 +1310,8 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
             const newComment = {
                 id: taskData.allComments.length + 1,
                 author: {
-                    name: 'ผู้ใช้ปัจจุบัน',
-                    avatar: 'YO'
+                    name: '<?= $_SESSION['user_fullname'] ?>',
+                    avatar: '<?= $_SESSION['user_avatar'] ?>'
                 },
                 content: content,
                 created_at: new Date().toISOString()
@@ -1177,16 +1321,95 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
             currentCommentsPage = 1;
             loadComments();
             commentInput.value = '';
-
-            // Add to activity
             taskData.allActivity.unshift({
-                type: 'comment',
-                text: 'เพิ่มความคิดเห็นโดย ผู้ใช้ปัจจุบัน',
-                time: new Date().toISOString()
+                fd_topic_log_type: 'comment',
+                fd_topic_log_text: 'เพิ่มความคิดเห็นโดย <?= $_SESSION['user_fullname'] ?>',
+                fd_topic_log_time: new Date().toISOString()
             });
             loadActivity();
 
-            alert('เพิ่มความคิดเห็นสำเร็จ');
+            // alert('เพิ่มความคิดเห็นสำเร็จ');
+        }
+
+        async function addComment() {
+            const commentInput = document.getElementById('commentInput');
+            const content = commentInput.value.trim();
+
+            if (!content) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'กรุณาใส่ความคิดเห็น',
+                    confirmButtonText: 'ตกลง'
+                });
+                return;
+            }
+
+            const payload = {
+                content: content,
+                task_id: '<?= $TaskID_Encode ?>',
+                user_id: '<?= $_SESSION['user_id'] ?>',
+                user_fullname: '<?= $_SESSION['user_fullname'] ?>'
+            };
+
+            try {
+                const response = await fetch('api/add_comment.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'เกิดข้อผิดพลาด',
+                        text: result.message || 'เพิ่มความคิดเห็นไม่สำเร็จ'
+                    });
+                    return;
+                }
+
+                // ✅ เพิ่ม comment
+                taskData.allComments.unshift({
+                    id: result.comment_id,
+                    author: {
+                        name: payload.user_fullname,
+                        avatar: '<?= $_SESSION['user_avatar'] ?>'
+                    },
+                    content: content,
+                    created_at: result.created_at
+                });
+
+                // ✅ เพิ่ม activity
+                taskData.allActivity.unshift({
+                    fd_topic_log_type: 'comment',
+                    fd_topic_log_text: `เพิ่มความคิดเห็นโดย ${payload.user_fullname}`,
+                    fd_topic_log_time: result.created_at
+                });
+
+                currentCommentsPage = 1;
+                loadComments();
+                loadActivity();
+                commentInput.value = '';
+
+                // 🎉 สำเร็จ
+                Swal.fire({
+                    icon: 'success',
+                    title: 'เพิ่มความคิดเห็นสำเร็จ',
+                    timer: 1200,
+                    showConfirmButton: false
+                });
+
+            } catch (err) {
+                console.error(err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้',
+                    text: 'กรุณาลองใหม่อีกครั้ง'
+                });
+            }
         }
 
         function loadActivity() {
@@ -1225,9 +1448,14 @@ $taskData['allActivity'] = $result_log; // ดึงกิจกรรมจา�
             loadActivity();
         }
 
+        function viewFile(fileId) {
+            // เปิดไฟล์ในแท็บใหม่เพื่อดู
+            window.open('openfile.php?taskid=' + encodeURIComponent("<?= $_GET['taskID'] ?>") + '&file_id=' + encodeURIComponent(fileId) + '&view=1', '_blank');
+        }
+
         function downloadFile(fileId) {
             // alert(`กำลังดาวน์โหลดไฟล์ ID: ${fileId}`);
-            window.open('openfile.php?file_id=' + encodeURIComponent(fileId), '_blank');
+            window.open('openfile.php?taskid=' + encodeURIComponent("<?= $_GET['taskID'] ?>") + '&file_id=' + encodeURIComponent(fileId), '_blank');
         }
 
         function getCategoryName(category) {
