@@ -72,7 +72,9 @@ try {
     $category     = $_POST['taskCategory'] ?? null;
     $description  = $_POST['taskDescription'] ?? '';
     $status       = $_POST['taskStatus'] ?? '';
-    $due_date     = ($_POST['taskDueDate'] ?? null) === '0000-00-00' ? null : ($_POST['taskDueDate'] ?? null);
+    $due_date     = (empty($_POST['taskDueDate']) || $_POST['taskDueDate'] === '0000-00-00')
+        ? null
+        : $_POST['taskDueDate'];
     $importance   = $_POST['taskImportance'] ?? null;
     $createdBy    = $_SESSION['user_id'] ?? null; // ผู้สร้างรายการ
     $mentionedUsers   = $_POST['mentionedUsers'] ?? '';
@@ -94,11 +96,17 @@ try {
         'fd_topic_status'      => $_POST['taskStatus'] ?? '',
         'fd_topic_participant' => $additionalUsers,
         'fd_topic_importance'  => $_POST['taskImportance'] ?? '',
-        'fd_topic_due_date'    => ($_POST['taskDueDate'] ?? null) === '0000-00-00' ? null : ($_POST['taskDueDate'] ?? null)
+        'fd_topic_due_date' => (empty($_POST['taskDueDate']) || $_POST['taskDueDate'] === '0000-00-00')
+            ? null
+            : $_POST['taskDueDate']
     ];
 
     //เปรียบเทียบข้อมูลเดิมกับข้อมูลใหม่
     $edit_data = false;
+    $result_task[0]['fd_topic_due_date'] =
+        (empty($result_task[0]['fd_topic_due_date']) || $result_task[0]['fd_topic_due_date'] === '0000-00-00')
+        ? ''
+        : $result_task[0]['fd_topic_due_date'];
     $old = $result_task[0] ?? null;
     if (!$old) {
         // ไม่เจอข้อมูล

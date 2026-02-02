@@ -1238,7 +1238,7 @@ try {
                 // Auto redirect สำหรับ success (ถ้าต้องการ)
                 if (resultType === 'success' || resultType === 'warning') {
                     await new Promise(resolve => setTimeout(resolve, 1000));
-                    window.location.href = 'task_detail.php';
+                    window.location.href = 'task_detail.php?taskID=<?= $taskID ?>';
                 }
 
             } catch (error) {
@@ -1252,7 +1252,7 @@ try {
             const currentState = document.body.className;
 
             if (currentState === 'success') {
-                window.location.href = 'task_detail.php';
+                window.location.href = 'task_detail.php?taskID=<?= $taskID ?>';
             } else if (currentState === 'info' || currentState === 'warning') {
                 window.location.href = 'index.php';
             } else if (currentState === 'error') {

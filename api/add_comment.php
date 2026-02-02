@@ -1,11 +1,11 @@
 <?php
 session_start();
+include 'check_sesion_api.php';
 date_default_timezone_set('Asia/Bangkok');
 
 require_once '../class/crud.class.php';
 require_once '../class/util.class.php';
 require_once '../class/encrypt.class.php';
-require_once '../class/fileupload.class.php';
 $object   = new CRUD();
 $util     = new Util();
 $Encrypt  = new Encrypt_data();
@@ -14,16 +14,6 @@ $now = new DateTime();
 
 $formatted_now = $now->format('Y-m-d H:i:s');
 header('Content-Type: application/json');
-
-// 🔒 เช็ค session
-if (empty($_SESSION['user_id'])) {
-    echo json_encode([
-        'success' => false,
-        'code' => 'SESSION_EXPIRED',
-        'message' => 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'
-    ]);
-    exit;
-}
 
 // รับ JSON
 $data = json_decode(file_get_contents("php://input"), true);

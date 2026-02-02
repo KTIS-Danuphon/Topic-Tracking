@@ -1152,7 +1152,7 @@ $_SESSION['user_avatar'] = $avatar;
                 </span>
                 <span class="category-badge">
                     <i class="bi bi-tag me-1"></i>
-                    ${getCategoryName(taskData.category)}
+                    ${taskData.category}
                 </span>
                 <span class="priority-stars" title="${taskData.importance} ดาว">
                     ${generateStars(taskData.importance)}
