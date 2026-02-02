@@ -13,7 +13,7 @@ $now = new DateTime();
 $formatted_now = $now->format('Y-m-d H:i:s');
 
 $table = 'tb_notifications_c050968 nt';
-$fields = 'nt.fd_notification_id, nt.fd_task_id, nt.fd_title, nt.fd_message, nt.fd_icontype, nt.fd_created_at, ntu.fd_is_read, ntu.fd_user_id  ';
+$fields = 'nt.fd_notification_id, nt.fd_task_id, nt.fd_title, nt.fd_message, nt.fd_icontype, nt.fd_created_at, ntu.fd_notification_user_id, ntu.fd_is_read, ntu.fd_user_id  ';
 $where = 'LEFT JOIN tb_notification_users_c050968 ntu ON ntu.fd_notification_id = nt.fd_notification_id ';
 $where .= 'WHERE nt.fd_is_deleted = "0" AND ntu.fd_user_id = "' . $_SESSION['user_id'] . '" AND ntu.fd_is_deleted = "0" ';
 $where .= 'ORDER BY nt.fd_created_at DESC ';
@@ -68,6 +68,7 @@ function timeAgoTH($datetime) //ฟังก์ชันแปลงเวลา
     return "{$day} {$month} {$year} {$hour}";
 }
 
+$i = 1;
 foreach ($result_notification as $row) {
     $is_read = '';
     switch ($row['fd_is_read']) { //สถานะการอ่าน: 0=ยังไม่ได้อ่าน, 1=อ่านแล้ว
@@ -82,7 +83,8 @@ foreach ($result_notification as $row) {
             break;
     }
     $notification[] = [
-        'id' =>  $Encrypt->EnCrypt_pass($row['fd_notification_id']), //id แจ้งเตือน
+        'id' =>  $i, //id แจ้งเตือน
+        'notification_user_id' => $Encrypt->EnCrypt_pass($row['fd_notification_user_id']),
         'type' => $row['fd_icontype'], //ประเภทแจ้งเตือน
         'title' => $row['fd_title'], //หัวข้อแจ้งเตือน
         'message' => $row['fd_message'], //ข้อความแจ้งเตือน
@@ -92,6 +94,7 @@ foreach ($result_notification as $row) {
         'encrypt_userid' => $Encrypt->EnCrypt_pass($row['fd_user_id']),
         'encrypt_id' => $Encrypt->EnCrypt_pass($row['fd_task_id']), //เข้ารหัส id งาน
     ];
+    $i++;
 }
 ?>
 <!DOCTYPE html>
@@ -953,18 +956,18 @@ foreach ($result_notification as $row) {
                 </div>
 
                 <div class="notification-actions">
-                    <button class="btn btn-sm btn-primary" onclick="markAllAsRead()">
+                    <button class="btn btn-sm btn-primary" onclick="markAllAsReadAPI()">
                         <i class="bi bi-check-all me-1"></i>
                         ทำเครื่องหมายว่าอ่านทั้งหมด
                     </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteAllRead()">
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteAllReadAPI()">
                         <i class="bi bi-trash me-1"></i>
                         ลบที่อ่านแล้ว
                     </button>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="refreshNotifications()">
+                    <!-- <button class="btn btn-sm btn-outline-secondary" onclick="refreshNotifications()">
                         <i class="bi bi-arrow-clockwise me-1"></i>
                         รีเฟรช
-                    </button>
+                    </button> -->
                 </div>
             </div>
 
@@ -1128,7 +1131,7 @@ foreach ($result_notification as $row) {
         //         taskId: null
         //     }
         // ];
-        const allNotifications = <?php echo json_encode($notification); ?>;
+        let allNotifications = <?php echo json_encode($notification); ?>;
 
         let currentFilter = 'all';
         let displayedCount = 10;
@@ -1163,7 +1166,7 @@ foreach ($result_notification as $row) {
 
             const html = notificationsToShow.map(notification => `
                 <div class="notification-item ${!notification.isRead ? 'unread' : ''}" 
-                     onclick="handleNotificationClick('${notification.id}')">
+                     onclick="readNotificationTaskAPI('${notification.encrypt_id}','${notification.notification_user_id}')">
                     ${!notification.isRead ? '<span class="unread-badge">ใหม่</span>' : ''}
                     <div class="notification-icon ${notification.type}">
                         <i class="bi ${getIconClass(notification.type)}"></i>
@@ -1177,16 +1180,23 @@ foreach ($result_notification as $row) {
                             <div class="notification-time">${notification.time}</div>
                         </div>
                         ${notification.taskId ? `
-                            <div class="notification-actions-btn">
-                                <button class="btn btn-sm btn-primary btn-notification" 
-                                        onclick="event.stopPropagation(); readNotificationTask('${notification.encrypt_id}')">
-                                    <i class="bi bi-eye me-1"></i>ดูรายละเอียด
-                                </button>
-                                <button class="btn btn-sm btn-outline-secondary btn-notification" 
-                                        onclick="event.stopPropagation(); markAsRead('${notification.id}')">
-                                    <i class="bi bi-check me-1"></i>ทำเครื่องหมายว่าอ่าน
-                                </button>
-                            </div>
+                        <div class="notification-actions-btn">
+                            <button class="btn btn-sm btn-primary btn-notification"
+                                onclick="event.stopPropagation(); readNotificationTaskAPI('${notification.encrypt_id}','${notification.notification_user_id}')">
+                                <i class="bi bi-eye me-1"></i>ดูรายละเอียด
+                            </button>
+
+                            <button class="btn btn-sm btn-outline-secondary btn-notification"
+                                onclick="event.stopPropagation(); markAsReadAPI('${notification.notification_user_id}')">
+                                <i class="bi bi-check me-1"></i>อ่านแล้ว
+                            </button>
+
+                            <button class="btn btn-sm btn-outline-danger btn-notification"
+                                onclick="event.stopPropagation(); deleteNotificationAPI('${notification.id}','${notification.notification_user_id}')">
+                                <i class="bi bi-trash me-1"></i>ไม่แสดงแจ้งเตือนนี้อีก
+                            </button>
+                        </div>
+
                         ` : ''}
                     </div>
                 </div>
@@ -1202,7 +1212,7 @@ foreach ($result_notification as $row) {
             }
         }
 
-        function filterNotifications(filter) {
+        function filterNotifications(filter, clickedElement = null) {
             currentFilter = filter;
             displayedCount = 10;
 
@@ -1210,7 +1220,20 @@ foreach ($result_notification as $row) {
             document.querySelectorAll('.filter-tab').forEach(tab => {
                 tab.classList.remove('active');
             });
-            event.target.closest('.filter-tab').classList.add('active');
+
+            // ถ้ามี element ที่ถูกคลิก ให้เพิ่ม active class
+            if (clickedElement) {
+                const tabElement = clickedElement.closest('.filter-tab');
+                if (tabElement) {
+                    tabElement.classList.add('active');
+                }
+            } else {
+                // ถ้าไม่มี element (เรียกจาก code) ให้หา tab ที่ตรงกับ filter
+                const defaultTab = document.querySelector(`.filter-tab[onclick*="${filter}"]`);
+                if (defaultTab) {
+                    defaultTab.classList.add('active');
+                }
+            }
 
             // Filter notifications
             if (filter === 'all') {
@@ -1229,24 +1252,211 @@ foreach ($result_notification as $row) {
             renderNotifications();
         }
 
-        function markAllAsRead() {
-            if (confirm('ทำเครื่องหมายว่าอ่านทั้งหมดหรือไม่?')) {
-                allNotifications.forEach(n => n.isRead = true);
-                updateBadges();
-                renderNotifications();
-                alert('ทำเครื่องหมายว่าอ่านทั้งหมดเรียบร้อยแล้ว');
+
+        function markAllAsReadAPI() {
+
+            const unreadNotifications = allNotifications.filter(n => !n.isRead);
+
+            if (unreadNotifications.length === 0) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'ไม่มีการแจ้งเตือน',
+                    text: 'ไม่มีการแจ้งเตือนที่ยังไม่ได้อ่าน',
+                    confirmButtonText: 'ตกลง'
+                });
+                return;
             }
+
+            Swal.fire({
+                title: 'ยืนยันการทำรายการ',
+                text: 'ต้องการทำเครื่องหมายว่าอ่านทั้งหมดหรือไม่?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'ใช่, ทำเครื่องหมาย',
+                cancelButtonText: 'ยกเลิก',
+                reverseButtons: true
+            }).then((result) => {
+
+                if (!result.isConfirmed) return;
+
+                const notificationUserIds = unreadNotifications.map(n => n.notification_user_id);
+
+                Swal.fire({
+                    title: 'กำลังดำเนินการ...',
+                    text: 'กรุณารอสักครู่',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                apiFetch('api/notification_mark_all_read.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        // notification_user_ids: notificationUserIds
+                    })
+                }).then(res => {
+
+                    if (!res) return;
+
+                    if (res.status === 'success') {
+
+                        allNotifications.forEach(n => n.isRead = true);
+
+                        updateBadges();
+                        renderNotifications();
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'สำเร็จ',
+                            text: 'ทำเครื่องหมายว่าอ่านทั้งหมดเรียบร้อยแล้ว',
+                            timer: 1500,
+                            showConfirmButton: false
+                        });
+
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'เกิดข้อผิดพลาด',
+                            text: res.message || 'ไม่สามารถทำรายการได้'
+                        });
+                    }
+                }).catch(() => {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'เชื่อมต่อไม่ได้',
+                        text: 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้'
+                    });
+                });
+
+            });
         }
 
-        function deleteAllRead() {
-            if (confirm('ลบการแจ้งเตือนที่อ่านแล้วทั้งหมดหรือไม่?')) {
-                const readCount = allNotifications.filter(n => n.isRead).length;
-                allNotifications.splice(0, allNotifications.length,
-                    ...allNotifications.filter(n => !n.isRead));
-                updateBadges();
-                filterNotifications(currentFilter);
-                alert(`ลบการแจ้งเตือน ${readCount} รายการเรียบร้อยแล้ว`);
+
+        function markAsReadAPI(notificationUserId) {
+            apiFetch('api/notification_mark_read.php', { // ✅ ใช้ apiFetch
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        notification_user_id: notificationUserId
+                    })
+                })
+                .then(res => {
+                    if (!res) return;
+
+                    if (res.status === 'success') {
+                        const n = allNotifications.find(
+                            n => n.notification_user_id === notificationUserId
+                        );
+                        if (n) n.isRead = true;
+
+                        updateBadges();
+                        renderNotifications();
+                    }
+                });
+        }
+
+
+        function deleteAllReadAPI() {
+
+            const readNotifications = allNotifications.filter(n => n.isRead);
+
+            if (readNotifications.length === 0) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'ไม่มีการแจ้งเตือน',
+                    text: 'ไม่มีการแจ้งเตือนที่อ่านแล้ว',
+                    confirmButtonText: 'ตกลง'
+                });
+                return;
             }
+
+            Swal.fire({
+                icon: 'warning',
+                title: 'ยืนยันการลบ',
+                text: `คุณต้องการลบการแจ้งเตือนที่อ่านแล้วทั้งหมด ${readNotifications.length} รายการหรือไม่?`,
+                showCancelButton: true,
+                confirmButtonText: 'ลบ',
+                cancelButtonText: 'ยกเลิก',
+                confirmButtonColor: '#d33'
+            }).then(result => {
+
+                if (!result.isConfirmed) return;
+
+                const notificationUserIds = readNotifications.map(
+                    n => n.notification_user_id
+                );
+
+                apiFetch('api/notification_delete_all_read.php', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            // notification_user_ids: notificationUserIds
+                        })
+                    })
+                    .then(res => {
+                        if (!res || res.status !== 'success') return;
+
+                        // ลบจาก frontend
+                        allNotifications = allNotifications.filter(n => !n.isRead);
+
+                        filterNotifications(currentFilter);
+                        updateBadges();
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'ลบสำเร็จ',
+                            text: `ลบการแจ้งเตือน ${readNotifications.length} รายการเรียบร้อยแล้ว`,
+                            timer: 2000,
+                            showConfirmButton: false
+                        });
+                    });
+            });
+        }
+
+
+        function deleteNotificationAPI(notiId, notificationUserId) {
+            // ส่งคำขอไปยัง API
+            return apiFetch('api/notification_delete.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        notification_user_id: notificationUserId
+                    })
+                })
+                .then(res => {
+                    // ตรวจสอบว่ามี response หรือไม่
+                    if (!res) return;
+
+                    // ถ้าลบสำเร็จ
+                    if (res.status === 'success') {
+                        // แปลง notiId เป็น string และ trim ช่องว่าง
+                        const targetId = String(notiId).trim();
+
+                        // ค้นหา index ของรายการที่จะลบ
+                        const indexToRemove = allNotifications.findIndex(n =>
+                            String(n.id).trim() === targetId
+                        );
+
+                        // ถ้าเจอรายการ ให้ลบออก
+                        if (indexToRemove !== -1) {
+                            allNotifications.splice(indexToRemove, 1);
+                        }
+
+                        // อัปเดต filteredNotifications ด้วย
+                        filterNotifications(currentFilter);
+                        updateBadges();
+                    }
+                });
         }
 
         function refreshNotifications() {
@@ -1254,37 +1464,63 @@ foreach ($result_notification as $row) {
             filterNotifications(currentFilter);
         }
 
-        function markAsRead(id) {
-            const notification = allNotifications.find(n => n.id === id);
-            if (notification) {
-                notification.isRead = true;
-                updateBadges();
-                renderNotifications();
-            }
+        // function markAsRead(id) {
+        //     const notification = allNotifications.find(n => n.id === id);
+        //     if (notification) {
+        //         notification.isRead = true;
+        //         updateBadges();
+        //         renderNotifications();
+        //     }
+        // }
+
+        function readNotificationTaskAPI(taskId, notificationUserId) {
+            apiFetch('api/notification_detail_read.php', { // ✅ ใช้ apiFetch
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        taskID: taskId
+                    })
+                })
+                .then(res => {
+                    if (!res) return;
+
+                    if (res.status === 'success') {
+                        res.data.forEach(item => {
+                            const n = allNotifications.find(
+                                n => n.notification_user_id === item.fd_notification_user_id
+                            );
+                            if (n) n.isRead = true;
+                        });
+
+                        updateBadges();
+                        renderNotifications();
+                        window.location.href = `task_detail.php?taskID=${taskId}`; //ไปยังหน้ารายละเอียดงาน
+                    }
+                });
         }
 
-        function handleNotificationClick(id) {
-            markAsRead(id);
-        }
-
-        function readNotificationTask(taskId) {
-            //  window.location.href = `task_detail.php?taskID=${taskId}`; //ไปยังหน้ารายละเอียดงาน
-            window.location.href = `notification_read.php?taskID=${taskId}`; //ไปยังหน้าอ่านแจ้งเตอรายละเอียดงาน
-        }
 
         function updateBadges() {
             document.getElementById('badgeAll').textContent = allNotifications.length;
             document.getElementById('badgeUnread').textContent =
                 allNotifications.filter(n => !n.isRead).length;
-            const badge = document.getElementById('badgeUnread_menu'); //
+            const badge_navbar = document.getElementById('notification_badge'); //
+            const badge_sidebar = document.getElementById('badgeUnread_menu'); //
+
             const unreadCount = allNotifications.filter(n => !n.isRead).length;
 
             if (unreadCount === 0) {
-                badge.textContent = '';
-                badge.classList.remove('menu-badge');
+                badge_navbar.textContent = '';
+                badge_navbar.classList.remove('notification-badge');
+                badge_sidebar.textContent = '';
+                badge_sidebar.classList.remove('menu-badge');
             } else {
-                badge.textContent = unreadCount;
-                badge.classList.add('menu-badge');
+                badge_navbar.textContent = unreadCount;
+                badge_navbar.classList.add('notification-badge');
+                badge_sidebar.textContent = unreadCount;
+                badge_sidebar.classList.add('menu-badge');
             }
 
             document.getElementById('badgeTask').textContent =
@@ -1303,6 +1539,37 @@ foreach ($result_notification as $row) {
             updateBadges();
             renderNotifications();
         });
+
+        function apiFetch(url, options = {}) {
+            console.log('🔥 apiFetch called →', url);
+            return fetch(url, options)
+                .then(response => {
+
+                    // ถ้า server ตอบ 401 (optional แต่ดี)
+                    if (response.status === 401) {
+                        window.location.href = 'session_check.php';
+                        throw new Error('SESSION_EXPIRED');
+                    }
+
+                    return response.json();
+                })
+                .then(res => {
+
+                    // 🔴 session หมด (ตาม schema ที่ใช้)
+                    if (res.code === 'SESSION_EXPIRED') {
+                        alert(res.message || 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+                        window.location.href = 'session_check.php';
+                        throw new Error('SESSION_EXPIRED');
+                    }
+
+                    return res; // ส่งผลลัพธ์ให้ function ที่เรียก
+                })
+                .catch(err => {
+                    if (err.message !== 'SESSION_EXPIRED') {
+                        console.error('API ERROR:', err);
+                    }
+                });
+        }
     </script>
 </body>
 

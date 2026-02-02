@@ -21,7 +21,11 @@ $count_notification = $result_notification[0]['count_notification'];
     <div class="navbar-right">
         <button class="notification-btn" onclick="showNotifications()">
             <i class="bi bi-bell"></i>
-            <?= ($count_notification ?? 0) == 0 ? '' : '<span class="notification-badge">' . $count_notification . '</span>' ?>
+            <!-- <?= ($count_notification ?? 0) == 0 ? '' : '<span id class="notification-badge badgeUnread_menu">' . $count_notification . '</span>' ?> -->
+            <span id="notification_badge"
+                    <?= ($count_notification ?? 0) > 0 ? 'class="notification-badge"' : '' ?>>
+                    <?= ($count_notification ?? 0) ?: '' ?>
+                </span>
         </button>
 
         <div class="user-profile" onclick="toggleUserMenu()">
