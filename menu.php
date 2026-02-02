@@ -44,25 +44,29 @@ $count_notification = $result_notification[0]['count_notification'];
 
     <ul class="sidebar-menu">
         <?php if ($_SESSION['user_status'] == "admin") { ?>
-            <li class="menu-item">
+            <!-- <li class="menu-item">
                 <a href="dashboard.php" class="menu-link <?= $currentPage == 'dashboard.php' ? 'active' : '' ?>">
                     <i class="bi bi-speedometer2"></i>
                     <span>แดชบอร์ด</span>
                 </a>
-            </li>
+            </li> -->
         <?php } ?>
         <li class="menu-item">
             <a href="tasks.php" class="menu-link <?= in_array($currentPage, ['tasks.php', 'tesk_create.php', 'task_edit.php', 'task_detail.php']) ? 'active' : '' ?>">
                 <i class="bi bi-list-task"></i>
                 <span>งานทั้งหมด</span>
-                <span class="menu-badge">12</span>
+                <!-- <span class="menu-badge">12</span> -->
             </a>
         </li>
         <li class="menu-item">
             <a href="notifications.php" class="menu-link <?= $currentPage == 'notifications.php' ? 'active' : '' ?>">
                 <i class="bi bi-bell"></i>
                 <span>แจ้งเตือน</span>
-                <span id="badgeUnread_menu" class="menu-badge"><?= ($count_notification ?? 0) == 0 ? '' : $count_notification ?></span>
+                <span id="badgeUnread_menu"
+                    <?= ($count_notification ?? 0) > 0 ? 'class="menu-badge"' : '' ?>>
+                    <?= ($count_notification ?? 0) ?: '' ?>
+                </span>
+
             </a>
         </li>
         <!-- <li class="menu-item">
@@ -81,32 +85,35 @@ $count_notification = $result_notification[0]['count_notification'];
     <ul class="sidebar-menu">
         <?php if ($_SESSION['user_status'] == "admin") { ?>
             <li class="menu-item">
-                <a href="users.php" class="menu-link <?= $currentPage == 'users.php' ? 'active' : '' ?>">
+                <a href="users_management.php" class="menu-link <?= $currentPage == 'users_management.php' ? 'active' : '' ?>">
                     <i class="bi bi-people"></i>
                     <span>จัดการผู้ใช้</span>
                 </a>
             </li>
 
             <li class="menu-item">
-                <a href="categories.php" class="menu-link <?= $currentPage == 'categories.php' ? 'active' : '' ?>">
+                <a href="division_management.php" class="menu-link <?= $currentPage == 'division_management.php' ? 'active' : '' ?>">
                     <i class="bi bi-tags"></i>
                     <span>จัดการฝ่าย</span>
                 </a>
             </li>
         <?php } ?>
+        <?php if ($_SESSION['user_status'] == "user") { ?>
         <li class="menu-item">
-            <a href="settings.php" class="menu-link <?= $currentPage == 'settings.php' ? 'active' : '' ?>">
+            <a href="users_management.php" class="menu-link <?= $currentPage == 'settings.php' ? 'active' : '' ?>">
                 <i class="bi bi-gear"></i>
                 <span>ตั้งค่า</span>
             </a>
         </li>
+        <?php } ?>
+
         <?php if ($_SESSION['user_status'] == "admin") { ?>
-            <li class="menu-item">
+            <!-- <li class="menu-item">
                 <a href="reports.php" class="menu-link <?= $currentPage == 'reports.php' ? 'active' : '' ?>">
                     <i class="bi bi-file-earmark-bar-graph"></i>
                     <span>รายงาน</span>
                 </a>
-            </li>
+            </li> -->
         <?php } ?>
     </ul>
 
