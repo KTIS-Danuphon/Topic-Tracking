@@ -196,6 +196,8 @@ function updateUser()
         'fd_user_name'       => trim($_POST['username'] ?? ''),
         'fd_user_fullname'   => trim($_POST['fullname'] ?? ''),
         'fd_user_div'        => trim($_POST['division'] ?? ''),
+        'fd_user_status'        => trim($_POST['role'] ?? ''),
+        'fd_user_active'        => trim($_POST['status'] ?? ''),
         'fd_user_updated_at' => date('Y-m-d H:i:s')
     ];
 

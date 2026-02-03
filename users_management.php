@@ -44,7 +44,8 @@ $current_user_role = $current_user['fd_user_status'];
 // ดึงข้อมูลผู้ใช้ทั้งหมด
 $fields = 'u.fd_user_id, u.fd_user_name, u.fd_user_fullname, u.fd_user_status, u.fd_user_div, dm.fd_div_name, u.fd_user_active, u.fd_user_created_at, u.fd_user_updated_at';
 $where = 'LEFT JOIN tb_divisions_c050968 dm ON dm.fd_div_id = u.fd_user_div ';
-if ($current_user_role === 'admin') {
+$isAdmin = in_array($current_user_role, ['admin', 'executive']);
+if ($isAdmin) {
     // Admin เห็นทุกคน
     $where .= 'ORDER BY fd_user_created_at DESC';
 } else {
@@ -63,7 +64,7 @@ $stats = [
     'inactive' => 0
 ];
 
-if ($current_user_role === 'admin' && $result_user) {
+if ($isAdmin && $result_user) {
     foreach ($result_user as $row) {
         // นับตามสิทธิ์
         if ($row['fd_user_status'] === 'admin') {
@@ -506,7 +507,7 @@ if ($current_user_role === 'admin' && $result_user) {
             </div>
 
             <!-- Stats (Admin Only) -->
-            <?php if ($current_user_role === 'admin'): ?>
+            <?php if ($isAdmin): ?>
                 <div class="stats-card" id="statsSection">
                     <div class="row">
                         <div class="col-md-3 col-6">
@@ -557,7 +558,7 @@ if ($current_user_role === 'admin' && $result_user) {
                         <input type="text" class="form-control" id="searchInput"
                             placeholder="ค้นหาด้วยชื่อผู้ใช้, ชื่อ-นามสกุล...">
                     </div>
-                    <?php if ($current_user_role === 'admin'): ?>
+                    <?php if ($isAdmin): ?>
                         <div class="col-md-3">
                             <label class="form-label">สิทธิ์</label>
                             <select class="form-select" id="roleFilter">
@@ -577,7 +578,7 @@ if ($current_user_role === 'admin' && $result_user) {
                         </div>
                     <?php endif; ?>
                 </div>
-                <?php if ($current_user_role === 'admin'): ?>
+                <?php if ($isAdmin): ?>
                     <div class="mt-3">
                         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
                             <i class="bi bi-plus-circle me-2"></i>
@@ -593,6 +594,7 @@ if ($current_user_role === 'admin' && $result_user) {
                     <table class="table user-table" style="min-width: 1200px;">
                         <thead>
                             <tr>
+                                <th class="text-center" style="width: 80px;">#</th>
                                 <th style="width: 200px;">ชื่อผู้ใช้</th>
                                 <th style="width: 200px;">ชื่อ-นามสกุล</th>
                                 <th style="width: 180px;">ฝ่าย/ตำแหน่ง</th>
@@ -652,7 +654,13 @@ if ($current_user_role === 'admin' && $result_user) {
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">ชื่อผู้ใช้ <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="editUsername" required>
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-secondary text-white">
+                                                <i class="bi bi-lock-fill"></i>
+                                            </span>
+                                            <input type="text" id="editUsername" class="form-control readonly-strong" readonly>
+                                        </div>
+                                        <small class="text-muted">ไม่สามารถแก้ไขชื่อผู้ใช้ได้</small>
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <label class="form-label">ชื่อ-นามสกุล <span class="text-danger">*</span></label>
@@ -660,19 +668,7 @@ if ($current_user_role === 'admin' && $result_user) {
                                     </div>
                                 </div>
 
-                                <div class="mb-3">
-                                    <label class="form-label">ฝ่าย/ตำแหน่ง</label>
-                                    <select class="form-select" id="editDivision">
-                                        <option value="">-- เลือกฝ่าย --</option>
-                                        <?php
-                                        foreach ($result_division as $row) {
-                                            echo '<option value="' . $row['fd_div_id'] . '">' . $row['fd_div_name'] . '</option>';
-                                        }
-                                        ?>
-                                    </select>
-                                </div>
-
-                                <?php if ($current_user_role === 'admin'): ?>
+                                <?php if ($isAdmin): ?>
                                     <div class="row" id="adminEditFields">
                                         <div class="col-md-6 mb-3">
                                             <label class="form-label">สิทธิ์การใช้งาน</label>
@@ -693,6 +689,18 @@ if ($current_user_role === 'admin' && $result_user) {
                                 <?php endif; ?>
 
                                 <div class="mb-3">
+                                    <label class="form-label">ฝ่าย/ตำแหน่ง</label>
+                                    <select class="form-select" id="editDivision">
+                                        <option value="">-- เลือกฝ่าย --</option>
+                                        <?php
+                                        foreach ($result_division as $row) {
+                                            echo '<option value="' . $row['fd_div_id'] . '">' . $row['fd_div_name'] . '</option>';
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+
+                                <!-- <div class="mb-3">
                                     <label class="form-label">รหัสผ่านใหม่ (เว้นว่างหากไม่ต้องการเปลี่ยน)</label>
                                     <input type="password" class="form-control" id="editPassword" placeholder="••••••••">
                                 </div>
@@ -700,7 +708,7 @@ if ($current_user_role === 'admin' && $result_user) {
                                 <div class="mb-3">
                                     <label class="form-label">ยืนยันรหัสผ่านใหม่</label>
                                     <input type="password" class="form-control" id="editPasswordConfirm" placeholder="••••••••">
-                                </div>
+                                </div> -->
                             </form>
                         </div>
                         <div class="modal-footer">
@@ -716,7 +724,7 @@ if ($current_user_role === 'admin' && $result_user) {
             </div>
 
             <!-- Add User Modal (Admin Only) -->
-            <?php if ($current_user_role === 'admin'): ?>
+            <?php if ($isAdmin): ?>
                 <div class="modal fade" id="addUserModal" tabindex="-1">
                     <div class="modal-dialog modal-lg">
                         <div class="modal-content">
@@ -801,7 +809,8 @@ if ($current_user_role === 'admin' && $result_user) {
         // Current user from PHP
         const currentUser = {
             id: <?php echo $current_user_id; ?>,
-            role: '<?php echo $current_user_role; ?>'
+            role: '<?php echo $current_user_role; ?>',
+            isAdmin: <?php echo $isAdmin ? 'true' : 'false'; ?>
         };
 
         // Users data from database
@@ -870,7 +879,8 @@ if ($current_user_role === 'admin' && $result_user) {
 
             document.querySelector('.pagination-container').style.display = 'flex';
 
-            tbody.innerHTML = usersToShow.map(user => {
+            tbody.innerHTML = usersToShow.map((user, index) => {
+                const actualIndex = startIndex + index + 1;
                 const isCurrentUser = user.fd_user_id == currentUser.id;
                 const roleLabel = getRoleLabel(user.fd_user_status);
                 const statusLabel = user.fd_user_active == '1' ? 'ใช้งาน' : 'ไม่ใช้งาน';
@@ -878,6 +888,7 @@ if ($current_user_role === 'admin' && $result_user) {
 
                 return `
                     <tr class="${isCurrentUser ? 'current-user' : ''}">
+                        <td class="text-center">${actualIndex}</td>
                         <td>
                             <div class="user-name-cell" title="${user.fd_user_name}">
                                 ${user.fd_user_name}
@@ -950,15 +961,15 @@ if ($current_user_role === 'admin' && $result_user) {
         }
 
         function canEdit(userId) {
-            return currentUser.role === 'admin' || userId == currentUser.id;
+            return currentUser.isAdmin || userId == currentUser.id;
         }
 
         function canToggleStatus(userId) {
-            return currentUser.role === 'admin' && userId != currentUser.id;
+            return currentUser.isAdmin && userId != currentUser.id;
         }
 
         function canResetPassword(userId) {
-            return currentUser.role === 'admin';
+            return currentUser.isAdmin;
         }
 
         function updatePaginationInfo() {
@@ -1065,30 +1076,31 @@ if ($current_user_role === 'admin' && $result_user) {
             document.getElementById('editUserId').value = user.fd_user_id;
             document.getElementById('editUsername').value = user.fd_user_name;
             document.getElementById('editFullname').value = user.fd_user_fullname;
-            document.getElementById('editUserDivId').value = user.fd_user_div || '';
             document.getElementById('editDivision').value = user.fd_user_div || '';
 
-            <?php if ($current_user_role === 'admin'): ?>
+            <?php if ($isAdmin): ?>
                 document.getElementById('editRole').value = user.fd_user_status;
                 document.getElementById('editStatus').value = user.fd_user_active;
             <?php endif; ?>
 
-            document.getElementById('editPassword').value = '';
-            document.getElementById('editPasswordConfirm').value = '';
+            // 🔥 คุมฝ่ายตาม role ปัจจุบัน
+            toggleEditDivisionByRole(user.fd_user_status);
 
             const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
             modal.show();
         }
 
+
+
         async function saveUser() {
             const userId = document.getElementById('editUserId').value;
-            const password = document.getElementById('editPassword').value;
-            const passwordConfirm = document.getElementById('editPasswordConfirm').value;
+            // const password = document.getElementById('editPassword').value;
+            // const passwordConfirm = document.getElementById('editPasswordConfirm').value;
 
-            if (password && password !== passwordConfirm) {
-                showAlert('รหัสผ่านไม่ตรงกัน', 'danger');
-                return;
-            }
+            // if (password && password !== passwordConfirm) {
+            //     showAlert('รหัสผ่านไม่ตรงกัน', 'danger');
+            //     return;
+            // }
 
             const formData = new FormData();
             formData.append('action', 'update');
@@ -1096,12 +1108,22 @@ if ($current_user_role === 'admin' && $result_user) {
             formData.append('username', document.getElementById('editUsername').value);
             formData.append('fullname', document.getElementById('editFullname').value);
             formData.append('division', document.getElementById('editDivision').value);
+            formData.append('role', document.getElementById('editRole').value);
+            formData.append('status', document.getElementById('editStatus').value);
 
-            if (password) {
-                formData.append('password', password);
+            // if (password) {
+            //     formData.append('password', password);
+            // }
+            const role = document.getElementById('editRole').value;
+            const division = document.getElementById('editDivision').value;
+
+            // 🔴 ถ้าเปลี่ยนเป็น user ต้องมีฝ่าย
+            if (role === 'user' && !division) {
+                showAlert('กรุณาเลือกฝ่ายสำหรับผู้ใช้ทั่วไป', 'danger');
+                return;
             }
 
-            <?php if ($current_user_role === 'admin'): ?>
+            <?php if ($isAdmin): ?>
                 formData.append('role', document.getElementById('editRole').value);
                 formData.append('status', document.getElementById('editStatus').value);
             <?php endif; ?>
@@ -1140,21 +1162,33 @@ if ($current_user_role === 'admin' && $result_user) {
             }
         }
 
-        <?php if ($current_user_role === 'admin'): ?>
+        <?php if ($isAdmin): ?>
 
             function toggleDivisionRequirement() {
                 const role = document.getElementById('addRole').value;
                 const divisionRequired = document.getElementById('addDivisionRequired');
                 const divisionHelp = document.getElementById('divisionHelp');
+                const divisionSelect = document.getElementById('addDivision');
 
                 if (role === 'admin' || role === 'executive') {
+                    // ซ่อน * และแสดงข้อความช่วย
                     divisionRequired.style.display = 'none';
                     divisionHelp.style.display = 'block';
+
+                    // ล้างค่า + disable ช่องฝ่าย
+                    divisionSelect.value = '';
+                    divisionSelect.disabled = true;
                 } else {
+                    // แสดง * และซ่อนข้อความช่วย
                     divisionRequired.style.display = 'inline';
                     divisionHelp.style.display = 'none';
+
+                    // enable ช่องฝ่าย
+                    divisionSelect.disabled = false;
                 }
             }
+
+
 
             async function addUser() {
                 const username = document.getElementById('addUsername').value.trim();
@@ -1308,7 +1342,8 @@ if ($current_user_role === 'admin' && $result_user) {
                             title: 'สำเร็จ!',
                             html: `รีเซ็ตรหัสผ่านสำเร็จ<br><br><strong>รหัสผ่านใหม่:</strong> Ktisgroup`,
                             confirmButtonText: 'ตกลง',
-                            confirmButtonColor: '#667eea'
+                            confirmButtonColor: '#667eea',
+                            timer: 1000
                         });
                     } else {
                         showAlert(apiResult.message || 'เกิดข้อผิดพลาด', 'danger');
@@ -1320,6 +1355,25 @@ if ($current_user_role === 'admin' && $result_user) {
                     hideLoading();
                 }
             }
+            document.getElementById('editRole').addEventListener('change', function() {
+                toggleEditDivisionByRole(this.value);
+            });
+
+            function toggleEditDivisionByRole(role) {
+                const divisionSelect = document.getElementById('editDivision');
+
+                if (role === 'admin' || role === 'executive') {
+                    // ➜ เป็น admin/executive
+                    divisionSelect.value = ''; // ล้างฝ่าย
+                    divisionSelect.disabled = true; // disable
+                } else {
+                    // ➜ เป็น user
+                    divisionSelect.disabled = false;
+                }
+            }
+
+
+
         <?php endif; ?>
 
         // Search and Filter
@@ -1328,7 +1382,7 @@ if ($current_user_role === 'admin' && $result_user) {
             renderUsers();
         });
 
-        <?php if ($current_user_role === 'admin'): ?>
+        <?php if ($isAdmin): ?>
             document.getElementById('roleFilter').addEventListener('change', function() {
                 currentPage = 1;
                 renderUsers();
