@@ -13,7 +13,7 @@ $now = new DateTime();
 $formatted_now = $now->format('Y-m-d H:i:s');
 
 $table = 'tb_topics_c050968';
-$fields = 'fd_topic_id, fd_topic_title, fd_topic_detail, fd_topic_category, fd_topic_mentioned, fd_topic_status, fd_topic_participant, fd_topic_created_by, fd_topic_importance, fd_topic_private, fd_topic_active, fd_topic_created_at ';
+$fields = 'fd_topic_id, fd_topic_title, fd_topic_detail, fd_topic_category, fd_topic_mentioned, fd_topic_status, fd_topic_participant, fd_topic_created_by, fd_topic_importance, fd_topic_due_date, fd_topic_private, fd_topic_active, fd_topic_created_at ';
 switch ($_SESSION['user_status']) {
     //admin / executive → เห็น user ทุกคน
     case 'admin':
@@ -50,6 +50,7 @@ foreach ($result_topic as $row) {
         'importance' => $row['fd_topic_importance'], //ความเร่งด่วน
         'created_at' => $row['fd_topic_created_at'], //วันที่สร้างงาน
         'encrypt_id' => $Encrypt->EnCrypt_pass($row['fd_topic_id']), //เข้ารหัส id งาน
+        'due_date' => $row['fd_topic_due_date']
 
     ];
 }
@@ -253,6 +254,10 @@ foreach ($result_topic as $row) {
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
         }
 
         .task-description-preview {
@@ -334,6 +339,18 @@ foreach ($result_topic as $row) {
             color: #64748b;
         }
 
+        /* Due Date Badge Styles */
+        .badge {
+            font-weight: 500;
+            padding: 0.35rem 0.65rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            white-space: nowrap;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .cards-container.active {
@@ -347,6 +364,12 @@ foreach ($result_topic as $row) {
             .task-table {
                 min-width: 800px;
             }
+
+            .task-title-text {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.3rem;
+            }
         }
     </style>
 </head>
@@ -359,7 +382,7 @@ foreach ($result_topic as $row) {
         <div class="container-fluid">
             <!-- Header -->
             <div class="mb-4">
-                <h2 class="fw-bold mb-1">งานทั้งหมด</h2>
+                <h2 class="fw-bold mb-1">งานทั้งหมด <a class="btn btn-outline-primary btn-sm " href="#"   role="button">!คู่มือ</a></h2>
                 <p class="text-muted">จัดการและติดตามงานของคุณ</p>
             </div>
 
@@ -488,6 +511,68 @@ foreach ($result_topic as $row) {
             return statuses[status] || 'ไม่ทราบสถานะ';
         }
 
+        // ฟังก์ชันคำนวณจำนวนวันที่เหลือหรือเลยกำหนด
+        function calculateDaysRemaining(dueDate, status) {
+            // ตรวจสอบว่า status เป็น completed หรือไม่
+            if (status === 'completed') {
+                return null;
+            }
+            
+            // ตรวจสอบว่า dueDate เป็นค่าว่าง, null, undefined, หรือ 0000-00-00
+            if (!dueDate || 
+                dueDate === '' || 
+                dueDate === '0000-00-00' || 
+                dueDate === '0000-00-00 00:00:00' ||
+                dueDate === null) {
+                return null;
+            }
+
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            
+            const due = new Date(dueDate);
+            
+            // ตรวจสอบว่า date ที่แปลงมาถูกต้องหรือไม่
+            if (isNaN(due.getTime())) {
+                return null;
+            }
+            
+            due.setHours(0, 0, 0, 0);
+            
+            const diffTime = due - now;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            return diffDays;
+        }
+
+        // ฟังก์ชันสร้าง Badge แสดงสถานะวันครบกำหนด
+        function getDueDateBadge(daysRemaining) {
+            if (daysRemaining === null) return '';
+            
+            if (daysRemaining < 0) {
+                // เลยกำหนดแล้ว
+                const overdueDays = Math.abs(daysRemaining);
+                return `<span class="badge bg-danger" title="เลยกำหนดแล้ว">
+                    <i class="bi bi-exclamation-triangle-fill"></i> เลย ${overdueDays} วัน
+                </span>`;
+            } else if (daysRemaining === 0) {
+                // ครบกำหนดวันนี้
+                return `<span class="badge bg-warning text-dark" title="ครบกำหนดวันนี้">
+                    <i class="bi bi-alarm-fill"></i> วันนี้
+                </span>`;
+            } else if (daysRemaining <= 7) {
+                // ใกล้ครบกำหนด (เหลือไม่เกิน 7 วัน)
+                return `<span class="badge bg-warning text-dark" title="ใกล้ครบกำหนด">
+                    <i class="bi bi-hourglass-split"></i> เหลือ ${daysRemaining} วัน
+                </span>`;
+            } else {
+                // ยังมีเวลาเหลือมาก
+                return `<span class="badge bg-info text-white" title="ครบกำหนดอีก ${daysRemaining} วัน">
+                    <i class="bi bi-calendar-check"></i> เหลือ ${daysRemaining} วัน
+                </span>`;
+            }
+        }
+
         function formatDate(dateString) {
             const date = new Date(dateString);
             const options = {
@@ -547,7 +632,12 @@ foreach ($result_topic as $row) {
                 return;
             }
 
-            tbody.innerHTML = tasksToShow.map(task => `
+            tbody.innerHTML = tasksToShow.map(task => {
+                const daysRemaining = calculateDaysRemaining(task.due_date, task.status);
+                console.log(daysRemaining);
+                const dueDateBadge = getDueDateBadge(daysRemaining);
+                
+                return `
                 <tr onclick="viewTask('${task.encrypt_id}')">
                     <td>
                         <div class="task-id">
@@ -555,7 +645,10 @@ foreach ($result_topic as $row) {
                         </div>
                     </td>
                     <td class="task-title-cell">
-                        <div class="task-title-text">${task.title}</div>
+                        <div class="task-title-text">
+                            <span>${task.title}</span>
+                            ${dueDateBadge}
+                        </div>
                         <div class="task-description-preview">${task.description}</div>
                     </td>
                     <td>
@@ -579,7 +672,7 @@ foreach ($result_topic as $row) {
                         </div>
                     </td>
                 </tr>
-            `).join('');
+            `}).join('');
         }
 
         function renderCardView(tasksToShow) {
@@ -596,7 +689,11 @@ foreach ($result_topic as $row) {
                 return;
             }
 
-            cardContainer.innerHTML = tasksToShow.map(task => `
+            cardContainer.innerHTML = tasksToShow.map(task => {
+                const daysRemaining = calculateDaysRemaining(task.due_date, task.status);
+                const dueDateBadge = getDueDateBadge(daysRemaining);
+                
+                return `
                 <div class="task-card" onclick="viewTask('${task.encrypt_id}')">
                     <div class="card-header-section">
                         <div class="card-task-id">
@@ -607,7 +704,10 @@ foreach ($result_topic as $row) {
                         </div>
                     </div>
                     
-                    <div class="card-title">${task.title}</div>
+                    <div class="card-title">
+                        ${task.title}
+                        ${dueDateBadge}
+                    </div>
                     <div class="card-description">${task.description}</div>
                     
                     <div class="card-meta">
@@ -626,7 +726,7 @@ foreach ($result_topic as $row) {
                         </div>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         function renderTasks() {

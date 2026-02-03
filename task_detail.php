@@ -87,7 +87,7 @@ $where = 'WHERE fd_file_task_id = "' . $TaskID . '" AND fd_file_active = "1" ';
 $result_files = $object->ReadData($table, $fields, $where);
 
 $table = 'tb_comment_c050968 cm';
-$fields = 'cm.fd_comment_id, u.fd_user_name, cm.fd_comment_text, cm.fd_time_create ';
+$fields = 'cm.fd_comment_id, u.fd_user_fullname, cm.fd_comment_text, cm.fd_time_create ';
 $where = 'LEFT JOIN tb_users_c050968 u ON u.fd_user_id = cm.fd_user_id ';
 $where .= 'WHERE cm.fd_task_id = "' . $TaskID . '" AND cm.fd_comment_active = "1" ';
 $result_comment = $object->ReadData($table, $fields, $where);
@@ -129,7 +129,7 @@ if (!empty($result_comment)) {
     foreach ($result_comment as $row) {
 
         // สร้าง avatar จากอักษรย่อ (เช่น ชื่อ + นามสกุล)
-        $nameParts = explode(' ', trim($row['fd_user_name']));
+        $nameParts = explode(' ', trim($row['fd_user_fullname']));
         $avatar = '';
         foreach ($nameParts as $part) {
             $avatar .= mb_substr($part, 0, 1, 'UTF-8');
@@ -138,7 +138,7 @@ if (!empty($result_comment)) {
         $taskData['allComments'][] = [
             'id' => (int)$row['fd_comment_id'],
             'author' => [
-                'name' => $row['fd_user_name'],
+                'name' => $row['fd_user_fullname'],
                 'avatar' => $avatar
             ],
             'content' => $row['fd_comment_text'],
@@ -193,9 +193,12 @@ $_SESSION['user_avatar'] = $avatar;
             font-weight: 700;
             color: #1e293b;
             margin-bottom: 1rem;
-
             word-break: break-word;
             overflow-wrap: anywhere;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
 
         .task-meta {
@@ -626,6 +629,18 @@ $_SESSION['user_avatar'] = $avatar;
             opacity: 0.5;
         }
 
+        /* Due Date Badge Styles for Detail Page */
+        .badge {
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            border-radius: 16px;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+        }
+
         @media (max-width: 768px) {
             .task-meta {
                 flex-direction: column;
@@ -635,6 +650,9 @@ $_SESSION['user_avatar'] = $avatar;
 
             .task-title {
                 font-size: 1.5rem;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.75rem;
             }
 
             .action-buttons {
@@ -663,7 +681,7 @@ $_SESSION['user_avatar'] = $avatar;
                 <ol class="breadcrumb">
                     <!-- <li class="breadcrumb-item"><a href="index.php">หน้าแรก</a></li> -->
                     <li class="breadcrumb-item"><a href="tasks.php">งานทั้งหมด</a></li>
-                    <li class="breadcrumb-item active">รายละเอียดงาน</li>
+                    <li class="breadcrumb-item active">รายละเอียดงาน</li>&nbsp;&nbsp;<a class="btn btn-outline-primary btn-sm " href="#"   role="button">!คู่มือ</a>
                 </ol>
             </nav>
 
@@ -826,314 +844,6 @@ $_SESSION['user_avatar'] = $avatar;
     <script>
         // Mock task data with more comments and activities
         const taskData = <?= json_encode($taskData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT); ?>;
-        // const 
-        //         taskData.allComments = [{
-        //                 id: 1,
-        //                 author: {
-        //                     name: 'ดนุพล พื้นสันเทียะ',
-        //                     avatar: 'ดพ'
-        //                 },
-        //                 content: 'เริ่มทำ mockup เรียบร้อยแล้วครับ รอ review',
-        //                 created_at: '2025-12-21 09:15:00'
-        //             },
-        //             {
-        //                 id: 2,
-        //                 author: {
-        //                     name: 'วิชัย รักงาน',
-        //                     avatar: 'WR'
-        //                 },
-        //                 content: 'ดูดีมากครับ ขอเพิ่ม feature forgot password ด้วยนะครับ',
-        //                 created_at: '2024-12-21 14:30:00'
-        //             },
-        //             {
-        //                 id: 3,
-        //                 author: {
-        //                     name: 'สมหญิง สวยงาม',
-        //                     avatar: 'SS'
-        //                 },
-        //                 content: 'ผมเพิ่ม UI สำหรับ forgot password แล้วครับ',
-        //                 created_at: '2024-12-21 16:45:00'
-        //             },
-        //             {
-        //                 id: 4,
-        //                 author: {
-        //                     name: 'สมชาย ใจดี',
-        //                     avatar: 'SC'
-        //                 },
-        //                 content: 'OAuth Google ทำงานได้แล้วครับ กำลังทดสอบ Facebook',
-        //                 created_at: '2024-12-22 10:20:00'
-        //             },
-        //             {
-        //                 id: 5,
-        //                 author: {
-        //                     name: 'วิชัย รักงาน',
-        //                     avatar: 'WR'
-        //                 },
-        //                 content: 'ดีมากครับ ขอให้ทดสอบ edge cases ด้วยนะครับ',
-        //                 created_at: '2024-12-22 11:30:00'
-        //             },
-        //             {
-        //                 id: 6,
-        //                 author: {
-        //                     name: 'สมหญิง สวยงาม',
-        //                     avatar: 'SS'
-        //                 },
-        //                 content: 'พบ bug ตอน login ด้วย Facebook บนมือถือครับ',
-        //                 created_at: '2024-12-22 14:15:00'
-        //             },
-        //             {
-        //                 id: 7,
-        //                 author: {
-        //                     name: 'สมชาย ใจดี',
-        //                     avatar: 'SC'
-        //                 },
-        //                 content: 'แก้ bug Facebook login เรียบร้อยแล้วครับ',
-        //                 created_at: '2024-12-22 16:30:00'
-        //             },
-        //             {
-        //                 id: 8,
-        //                 author: {
-        //                     name: 'วิชัย รักงาน',
-        //                     avatar: 'WR'
-        //                 },
-        //                 content: 'ขอให้เพิ่ม unit test ด้วยครับ',
-        //                 created_at: '2024-12-23 09:00:00'
-        //             },
-        //             {
-        //                 id: 9,
-        //                 author: {
-        //                     name: 'สมชาย ใจดี',
-        //                     avatar: 'SC'
-        //                 },
-        //                 content: 'เพิ่ม unit test ครบทุก function แล้วครับ coverage 95%',
-        //                 created_at: '2024-12-23 14:20:00'
-        //             },
-        //             {
-        //                 id: 10,
-        //                 author: {
-        //                     name: 'วิชัย รักงาน',
-        //                     avatar: 'WR'
-        //                 },
-        //                 content: 'เยี่ยมมากครับ พร้อม deploy แล้ว',
-        //                 created_at: '2024-12-23 15:45:00'
-        //             }
-        //         ];
-        // const taskData = {
-        //     id: 1,
-        //     title: "พัฒนาระบบ Login ใหม่",
-        //     description: "ออกแบบและพัฒนาระบบ Login ที่รองรับ OAuth 2.0\n\nต้องทำให้รองรับ:\n- Google Login\n- Facebook Login\n- Email/Password\n\nแท็ก: @สมชาย ใจดี @สมหญิง สวยงาม",
-        //     category: "development",
-        //     status: "in-progress",
-        //     importance: 5,
-        //     created_at: "2024-12-20 10:30:00",
-        //     updated_at: "2024-12-23 14:20:00",
-        //     team: [{
-        //             id: 1,
-        //             name: 'สมชาย ใจดี',
-        //             role: 'Developer',
-        //             avatar: 'SC'
-        //         },
-        //         {
-        //             id: 2,
-        //             name: 'สมหญิง สวยงาม',
-        //             role: 'Designer',
-        //             avatar: 'SS'
-        //         },
-        //         {
-        //             id: 3,
-        //             name: 'วิชัย รักงาน',
-        //             role: 'Project Manager',
-        //             avatar: 'WR'
-        //         }
-        //     ],
-        //     files: [{
-        //             id: 1,
-        //             name: 'login-mockup.pdf',
-        //             size: 1024000,
-        //             type: 'application/pdf'
-        //         },
-        //         {
-        //             id: 2,
-        //             name: 'design-spec.docx',
-        //             size: 512000,
-        //             type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        //         },
-        //         {
-        //             id: 3,
-        //             name: 'screenshot.png',
-        //             size: 2048000,
-        //             type: 'image/png'
-        //         }
-        //     ],
-
-        //     allComments: [{
-        //             id: 1,
-        //             author: {
-        //                 name: 'สมชาย ใจดี',
-        //                 avatar: 'SC'
-        //             },
-        //             content: 'เริ่มทำ mockup เรียบร้อยแล้วครับ รอ review',
-        //             created_at: '2024-12-21 09:15:00'
-        //         },
-        //         {
-        //             id: 2,
-        //             author: {
-        //                 name: 'วิชัย รักงาน',
-        //                 avatar: 'WR'
-        //             },
-        //             content: 'ดูดีมากครับ ขอเพิ่ม feature forgot password ด้วยนะครับ',
-        //             created_at: '2024-12-21 14:30:00'
-        //         },
-        //         {
-        //             id: 3,
-        //             author: {
-        //                 name: 'สมหญิง สวยงาม',
-        //                 avatar: 'SS'
-        //             },
-        //             content: 'ผมเพิ่ม UI สำหรับ forgot password แล้วครับ',
-        //             created_at: '2024-12-21 16:45:00'
-        //         },
-        //         {
-        //             id: 4,
-        //             author: {
-        //                 name: 'สมชาย ใจดี',
-        //                 avatar: 'SC'
-        //             },
-        //             content: 'OAuth Google ทำงานได้แล้วครับ กำลังทดสอบ Facebook',
-        //             created_at: '2024-12-22 10:20:00'
-        //         },
-        //         {
-        //             id: 5,
-        //             author: {
-        //                 name: 'วิชัย รักงาน',
-        //                 avatar: 'WR'
-        //             },
-        //             content: 'ดีมากครับ ขอให้ทดสอบ edge cases ด้วยนะครับ',
-        //             created_at: '2024-12-22 11:30:00'
-        //         },
-        //         {
-        //             id: 6,
-        //             author: {
-        //                 name: 'สมหญิง สวยงาม',
-        //                 avatar: 'SS'
-        //             },
-        //             content: 'พบ bug ตอน login ด้วย Facebook บนมือถือครับ',
-        //             created_at: '2024-12-22 14:15:00'
-        //         },
-        //         {
-        //             id: 7,
-        //             author: {
-        //                 name: 'สมชาย ใจดี',
-        //                 avatar: 'SC'
-        //             },
-        //             content: 'แก้ bug Facebook login เรียบร้อยแล้วครับ',
-        //             created_at: '2024-12-22 16:30:00'
-        //         },
-        //         {
-        //             id: 8,
-        //             author: {
-        //                 name: 'วิชัย รักงาน',
-        //                 avatar: 'WR'
-        //             },
-        //             content: 'ขอให้เพิ่ม unit test ด้วยครับ',
-        //             created_at: '2024-12-23 09:00:00'
-        //         },
-        //         {
-        //             id: 9,
-        //             author: {
-        //                 name: 'สมชาย ใจดี',
-        //                 avatar: 'SC'
-        //             },
-        //             content: 'เพิ่ม unit test ครบทุก function แล้วครับ coverage 95%',
-        //             created_at: '2024-12-23 14:20:00'
-        //         },
-        //         {
-        //             id: 10,
-        //             author: {
-        //                 name: 'วิชัย รักงาน',
-        //                 avatar: 'WR'
-        //             },
-        //             content: 'เยี่ยมมากครับ พร้อม deploy แล้ว',
-        //             created_at: '2024-12-23 15:45:00'
-        //         }
-        //     ],
-        //     allActivity: [{
-        //             type: 'created',
-        //             text: 'สร้างงานโดย สมชาย ใจดี',
-        //             time: '2024-12-20 10:30:00'
-        //         },
-        //         {
-        //             type: 'status',
-        //             text: 'เปลี่ยนสถานะเป็น กำลังดำเนินการ',
-        //             time: '2024-12-20 11:00:00'
-        //         },
-        //         {
-        //             type: 'comment',
-        //             text: 'เพิ่มความคิดเห็นโดย สมชาย ใจดี',
-        //             time: '2024-12-21 09:15:00'
-        //         },
-        //         {
-        //             type: 'comment',
-        //             text: 'เพิ่มความคิดเห็นโดย วิชัย รักงาน',
-        //             time: '2024-12-21 14:30:00'
-        //         },
-        //         {
-        //             type: 'comment',
-        //             text: 'เพิ่มความคิดเห็นโดย สมหญิง สวยงาม',
-        //             time: '2024-12-21 16:45:00'
-        //         },
-        //         {
-        //             type: 'file',
-        //             text: 'อัปโหลดไฟล์ login-mockup.pdf',
-        //             time: '2024-12-22 09:00:00'
-        //         },
-        //         {
-        //             type: 'comment',
-        //             text: 'เพิ่มความคิดเห็นโดย สมชาย ใจดี',
-        //             time: '2024-12-22 10:20:00'
-        //         },
-        //         {
-        //             type: 'comment',
-        //             text: 'เพิ่มความคิดเห็นโดย วิชัย รักงาน',
-        //             time: '2024-12-22 11:30:00'
-        //         },
-        //         {
-        //             type: 'file',
-        //             text: 'อัปโหลดไฟล์ design-spec.docx',
-        //             time: '2024-12-22 13:00:00'
-        //         },
-        //         {
-        //             type: 'comment',
-        //             text: 'เพิ่มความคิดเห็นโดย สมหญิง สวยงาม',
-        //             time: '2024-12-22 14:15:00'
-        //         },
-        //         {
-        //             type: 'comment',
-        //             text: 'เพิ่มความคิดเห็นโดย สมชาย ใจดี',
-        //             time: '2024-12-22 16:30:00'
-        //         },
-        //         {
-        //             type: 'file',
-        //             text: 'อัปโหลดไฟล์ screenshot.png',
-        //             time: '2024-12-22 17:00:00'
-        //         },
-        //         {
-        //             type: 'comment',
-        //             text: 'เพิ่มความคิดเห็นโดย วิชัย รักงาน',
-        //             time: '2024-12-23 09:00:00'
-        //         },
-        //         {
-        //             type: 'comment',
-        //             text: 'เพิ่มความคิดเห็นโดย สมชาย ใจดี',
-        //             time: '2024-12-23 14:20:00'
-        //         },
-        //         {
-        //             type: 'comment',
-        //             text: 'เพิ่มความคิดเห็นโดย วิชัย รักงาน',
-        //             time: '2024-12-23 15:45:00'
-        //         }
-        //     ]
-        // };
 
         // Pagination variables
         let commentsPerPage = 5;
@@ -1141,9 +851,79 @@ $_SESSION['user_avatar'] = $avatar;
         let activityPerPage = 5;
         let currentActivityPage = 1;
 
+        // ฟังก์ชันคำนวณจำนวนวันที่เหลือหรือเลยกำหนด
+        function calculateDaysRemaining(dueDate, status) {
+            // ตรวจสอบว่า status เป็น completed หรือไม่
+            if (status === 'completed') {
+                return null;
+            }
+            
+            // ตรวจสอบว่า dueDate เป็นค่าว่าง, null, undefined, หรือ 0000-00-00
+            if (!dueDate || 
+                dueDate === '' || 
+                dueDate === '0000-00-00' || 
+                dueDate === '0000-00-00 00:00:00' ||
+                dueDate === null) {
+                return null;
+            }
+
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            
+            const due = new Date(dueDate);
+            
+            // ตรวจสอบว่า date ที่แปลงมาถูกต้องหรือไม่
+            if (isNaN(due.getTime())) {
+                return null;
+            }
+            
+            due.setHours(0, 0, 0, 0);
+            
+            const diffTime = due - now;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            return diffDays;
+        }
+
+        // ฟังก์ชันสร้าง Badge แสดงสถานะวันครบกำหนด
+        function getDueDateBadge(daysRemaining) {
+            if (daysRemaining === null) return '';
+            
+            if (daysRemaining < 0) {
+                // เลยกำหนดแล้ว
+                const overdueDays = Math.abs(daysRemaining);
+                return `<span class="badge bg-danger" title="เลยกำหนดแล้ว">
+                    <i class="bi bi-exclamation-triangle-fill"></i> เลย ${overdueDays} วัน
+                </span>`;
+            } else if (daysRemaining === 0) {
+                // ครบกำหนดวันนี้
+                return `<span class="badge bg-warning text-dark" title="ครบกำหนดวันนี้">
+                    <i class="bi bi-alarm-fill"></i> วันนี้
+                </span>`;
+            } else if (daysRemaining <= 7) {
+                // ใกล้ครบกำหนด (เหลือไม่เกิน 7 วัน)
+                return `<span class="badge bg-warning text-dark" title="ใกล้ครบกำหนด">
+                    <i class="bi bi-hourglass-split"></i> เหลือ ${daysRemaining} วัน
+                </span>`;
+            } else {
+                // ยังมีเวลาเหลือมาก
+                return `<span class="badge bg-info text-white" title="ครบกำหนดอีก ${daysRemaining} วัน">
+                    <i class="bi bi-calendar-check"></i> เหลือ ${daysRemaining} วัน
+                </span>`;
+            }
+        }
+
         function loadTaskDetail() {
-            // Task Title
-            document.getElementById('taskTitle').textContent = taskData.title;
+            // คำนวณจำนวนวันที่เหลือหรือเลยกำหนด
+            const daysRemaining = calculateDaysRemaining(taskData.due_date, taskData.status);
+            const dueDateBadge = getDueDateBadge(daysRemaining);
+
+            // Task Title พร้อม badge
+            const taskTitleElement = document.getElementById('taskTitle');
+            taskTitleElement.innerHTML = `
+                <span>${taskData.title}</span>
+                ${dueDateBadge}
+            `;
 
             // Task Meta
             const metaHtml = `
