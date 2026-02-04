@@ -21,7 +21,7 @@ if (!$result_current || count($result_current) === 0) {
     exit();
 }
 $isAdmin = in_array($_SESSION['user_status'], ['admin', 'executive']);
-if ($isAdmin) {
+if (!$isAdmin) {
     echo "<script>
         alert('คุณไม่มีสิทธิ์ดูข้อมูลนี้');
         window.location.href = 'tasks.php';
