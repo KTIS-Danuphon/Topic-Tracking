@@ -19,6 +19,7 @@ $Encrypt  = new Encrypt_data();
 //     exit;
 // }
 // var_dump($_POST);
+unset($_SESSION['change_password']);
 $username = $util->testInput($_POST['username']);
 $password  = $Encrypt->EnCrypt_pass($util->testInput($_POST['password']));
 $table = 'tb_users_c050968 t1 ';
@@ -47,6 +48,11 @@ if (!empty($result_user)) {
         default:
             $_SESSION['user_status_name'] = 'ไม่ระบุ';
             break;
+    }
+    if ($_POST['password'] === 'Ktisgroup') {
+        $_SESSION['change_password'] = true; // บังคับเปลี่ยนรหัสผ่าน
+        header("Location: auth_change_password.php");
+        exit();
     }
     // $_SESSION['user_group'] = $result_user[0]['fd_user_div']; // กลุ่มผู้ใช้
     // $_SESSION['login_time'] = time(); // เก็บเวลาที่ login
@@ -555,8 +561,8 @@ if (!empty($result_user)) {
                     // // Redirect to tasks page after animation
                     setTimeout(() => {
                         window.location.href = 'tasks.php';
-                    }, 2000);
-                }, 1500);
+                    }, 500);
+                }, 500);
             }
             gotoTaskPage();
         </script>
