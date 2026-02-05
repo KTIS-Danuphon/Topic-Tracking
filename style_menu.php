@@ -572,3 +572,156 @@
         display: block;
     }
 </style>
+<style>
+    /* เมนูโปรไฟล์ */
+    /* User Dropdown */
+    .user-dropdown {
+        position: absolute;
+        top: calc(var(--navbar-height) - 10px);
+        right: 2rem;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+        min-width: 200px;
+        padding: 0.5rem 0;
+        display: none;
+        z-index: 1001;
+        animation: dropdownFade 0.2s ease;
+    }
+
+    @keyframes dropdownFade {
+        from {
+            opacity: 0;
+            transform: translateY(-5px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .user-dropdown.show {
+        display: block;
+    }
+
+    .dropdown-item {
+        width: 100%;
+        padding: 0.75rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 0.9rem;
+        color: #334155;
+        background: none;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 0.2s;
+    }
+
+    .dropdown-item i {
+        font-size: 1.1rem;
+    }
+
+    .dropdown-item:hover {
+        background: #f1f5f9;
+        color: var(--primary-color);
+    }
+
+    .dropdown-item.logout:hover {
+        background: #fef2f2;
+        color: #dc2626;
+    }
+
+    .dropdown-divider {
+        height: 1px;
+        background: #e2e8f0;
+        margin: 0.4rem 0;
+    }
+</style>
+<style>
+    /* Password Change Modal Styles - Improved Version */
+    #changePasswordModal .modal-content {
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    #changePasswordModal .form-control:focus {
+        border-color: #667eea !important;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15) !important;
+    }
+
+    #changePasswordModal .input-group .btn-outline-secondary:hover {
+        background: #f1f5f9;
+        color: #667eea;
+    }
+
+    /* Password Requirements List */
+    .requirements-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .requirement-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: #64748b;
+        transition: all 0.2s;
+    }
+
+    .requirement-item i {
+        font-size: 0.5rem;
+        color: #cbd5e1;
+        transition: all 0.2s;
+    }
+
+    .requirement-item.valid {
+        color: #16a34a;
+    }
+
+    .requirement-item.valid i {
+        color: #16a34a;
+        font-size: 0.75rem;
+    }
+
+    .requirement-item.invalid {
+        color: #dc2626;
+    }
+
+    .requirement-item.invalid i {
+        color: #dc2626;
+        font-size: 0.75rem;
+    }
+
+    /* Submit Button States */
+    #submitChangePassword:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    #submitChangePassword:not(:disabled):hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(102, 126, 234, 0.3);
+    }
+
+    /* Smooth Transitions */
+    .alert {
+        animation: slideDown 0.3s ease;
+    }
+
+    @keyframes slideDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>

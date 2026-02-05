@@ -382,7 +382,8 @@ foreach ($result_topic as $row) {
         <div class="container-fluid">
             <!-- Header -->
             <div class="mb-4">
-                <h2 class="fw-bold mb-1">งานทั้งหมด <a class="btn btn-outline-primary btn-sm " href="#"   role="button">!คู่มือ</a></h2>
+                <!-- <h2 class="fw-bold mb-1">งานทั้งหมด <a class="btn btn-outline-primary btn-sm " href="#"   role="button">!คู่มือ</a></h2> -->
+                <h2 class="fw-bold mb-1">งานทั้งหมด</h2>
                 <p class="text-muted">จัดการและติดตามงานของคุณ</p>
             </div>
 

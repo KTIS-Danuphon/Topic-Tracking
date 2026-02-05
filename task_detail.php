@@ -815,23 +815,6 @@ $_SESSION['user_avatar'] = $avatar;
             overlay.classList.toggle('show');
         }
 
-        // Notifications
-        function showNotifications() {
-            alert('แจ้งเตือนทั้งหมด:\n\n- งานใหม่ถูกมอบหมายให้คุณ\n- มีความคิดเห็นใหม่ในงาน\n- งานใกล้ครบกำหนด 3 งาน');
-        }
-
-        // User Menu
-        function toggleUserMenu() {
-            alert('เมนูผู้ใช้:\n- โปรไฟล์\n- ตั้งค่า\n- ออกจากระบบ');
-        }
-
-        // Logout
-        function logout() {
-            if (confirm('คุณต้องการออกจากระบบหรือไม่?')) {
-                window.location.href = 'logout.php';
-            }
-        }
-
         // Close sidebar when clicking on menu item (mobile)
         document.querySelectorAll('.menu-link').forEach(link => {
             link.addEventListener('click', function() {
